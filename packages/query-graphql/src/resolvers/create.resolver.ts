@@ -134,11 +134,10 @@ export const Creatable =
         @AuthorizerFilter({
           operationGroup: OperationGroup.CREATE,
           many: false
-        }) // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        })
         authorizeFilter?: Filter<DTO>
       ): Promise<DTO> {
-        // Ignore `authorizeFilter` for now but give users the ability to throw an UnauthorizedException
-        const created = await this.service.createOne(input.input.input)
+        const created = await this.service.createOne(input.input.input, { filter: authorizeFilter ?? {} })
         if (enableOneSubscriptions) {
           await this.publishCreatedEvent(created, authorizeFilter)
         }

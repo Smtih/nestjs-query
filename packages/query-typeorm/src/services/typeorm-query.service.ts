@@ -3,6 +3,7 @@ import {
   AggregateOptions,
   AggregateQuery,
   AggregateResponse,
+  applyFilter,
   Class,
   CountOptions,
   DeepPartial,
@@ -191,8 +192,14 @@ export class TypeOrmQueryService<Entity>
    * ```
    * @param record - The entity to create.
    */
-  public async createOne(record: DeepPartial<Entity>): Promise<Entity> {
+  public async createOne(record: DeepPartial<Entity>, opts?: UpdateOneOptions<Entity>): Promise<Entity> {
     const entity = await this.ensureIsEntityAndDoesNotExist(record)
+
+    const passesFilter = applyFilter(entity, opts.filter)
+
+    if (!passesFilter) {
+      throw new Error('Entity does not meet creation constraints')
+    }
 
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
