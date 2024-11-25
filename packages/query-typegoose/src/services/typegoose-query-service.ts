@@ -2,6 +2,9 @@ import { NotFoundException } from '@nestjs/common'
 import {
   AggregateQuery,
   AggregateResponse,
+  applyFilter,
+  CreateManyOptions,
+  CreateOneOptions,
   DeepPartial,
   DeleteManyResponse,
   DeleteOneOptions,
@@ -126,9 +129,13 @@ export class TypegooseQueryService<Entity extends Base> extends ReferenceQuerySe
    * const todoItem = await this.service.createOne({title: 'Todo Item', completed: false });
    * ```
    * @param record - The entity to create.
+   * @param opts - Additional options.
    */
-  async createOne(record: DeepPartial<Entity>): Promise<DocumentType<Entity>> {
+  async createOne(record: DeepPartial<Entity>, opts?: CreateOneOptions<Entity>): Promise<DocumentType<Entity>> {
     this.ensureIdIsNotPresent(record)
+    if (opts?.filter && !applyFilter(record as Entity, opts.filter)) {
+      throw new Error('Entity does not meet creation constraints')
+    }
     const doc = await this.Model.create(record as Partial<Entity>)
     return doc
   }
@@ -145,9 +152,10 @@ export class TypegooseQueryService<Entity extends Base> extends ReferenceQuerySe
    * ```
    * @param records - The entities to create.
    */
-  async createMany(records: DeepPartial<Entity>[]): Promise<DocumentType<Entity>[]> {
+  async createMany(records: DeepPartial<Entity>[], opts?: CreateManyOptions<Entity>): Promise<DocumentType<Entity>[]> {
     records.forEach((r) => this.ensureIdIsNotPresent(r))
-    const entities = await this.Model.create(records as Partial<Entity>[])
+    const recordsToCreate = opts?.filter ? applyFilter(records as Entity[], opts.filter) : records
+    const entities = await this.Model.create(recordsToCreate as Partial<Entity>[])
     return entities
   }
 
