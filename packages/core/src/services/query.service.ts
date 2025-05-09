@@ -245,7 +245,7 @@ export interface QueryService<DTO, C = DeepPartial<DTO>, U = DeepPartial<DTO>> {
    * @param item - the record to create.
    * @returns the created record.
    */
-  createOne(item: C): Promise<DTO>
+  createOne(item: C, opts?: UpdateOneOptions<DTO>): Promise<DTO>
 
   /**
    * Creates a multiple record.
