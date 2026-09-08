@@ -4,7 +4,7 @@
  */
 // eslint-disable-next-line max-classes-per-file
 import { Args, ArgsType, InputType, OmitType, Resolver } from '@nestjs/graphql'
-import { Class, DeepPartial, Filter, QueryService } from '@ptc-org/nestjs-query-core'
+import { AuthValidationOpts, Class, DeepPartial, Filter, QueryService } from '@ptc-org/nestjs-query-core'
 import omit from 'lodash.omit'
 
 import { OperationGroup } from '../auth'
@@ -24,13 +24,6 @@ import { createSubscriptionFilter, getSubscriptionEventName } from './helpers'
 import { BaseServiceResolver, ResolverClass, ServiceResolver, SubscriptionResolverOpts } from './resolver.interface'
 
 export type CreatedEvent<DTO> = { [eventName: string]: DTO }
-
-interface AuthValidationOpts {
-  /**
-   * Determines whether the auth filter should be passed into the query service
-   */
-  validateWithAuthFilter?: boolean
-}
 
 export interface CreateResolverOpts<DTO, C = DeepPartial<DTO>> extends SubscriptionResolverOpts, AuthValidationOpts {
   /**
@@ -103,6 +96,8 @@ export const Creatable =
     const enableSubscriptions = opts.enableSubscriptions === true
     const enableOneSubscriptions = opts.one?.enableSubscriptions ?? enableSubscriptions
     const enableManySubscriptions = opts.many?.enableSubscriptions ?? enableSubscriptions
+    const validateCreateOneWithAuthFilter = opts.one?.validateWithAuthFilter ?? opts.validateWithAuthFilter ?? false
+    const validateCreateManyWithAuthFilter = opts.many?.validateWithAuthFilter ?? opts.validateWithAuthFilter ?? false
     const createdEvent = getDTOEventName(EventType.CREATED, DTOClass)
     const {
       CreateDTOClass = defaultCreateDTO(dtoNames, DTOClass),
@@ -147,8 +142,7 @@ export const Creatable =
         })
         authorizeFilter?: Filter<DTO>
       ): Promise<DTO> {
-        const createOneOpts =
-          opts?.validateWithAuthFilter || opts?.one?.validateWithAuthFilter ? { filter: authorizeFilter ?? {} } : undefined
+        const createOneOpts = validateCreateOneWithAuthFilter && authorizeFilter ? { filter: authorizeFilter } : undefined
         const created = await this.service.createOne(input.input.input, createOneOpts)
         if (enableOneSubscriptions) {
           await this.publishCreatedEvent(created, authorizeFilter)
@@ -173,8 +167,7 @@ export const Creatable =
         })
         authorizeFilter?: Filter<DTO>
       ): Promise<DTO[]> {
-        const createManyOpts =
-          opts.validateWithAuthFilter || opts.many?.validateWithAuthFilter ? { filter: authorizeFilter ?? {} } : undefined
+        const createManyOpts = validateCreateManyWithAuthFilter && authorizeFilter ? { filter: authorizeFilter } : undefined
         const created = await this.service.createMany(input.input.input, createManyOpts)
         if (enableManySubscriptions) {
           await Promise.all(created.map((c) => this.publishCreatedEvent(c, authorizeFilter)))

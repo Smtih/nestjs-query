@@ -109,12 +109,20 @@ describe('CreateController', () => {
       expect(service.createOne).toHaveBeenCalledWith({ name: 'test' }, { filter: authorizedFilter })
     })
 
-    it('falls back to an empty filter when the authorizer resolves no filter', async () => {
+    it('does not pass opts when the authorizer resolves no filter', async () => {
       const service = await setupApp({ validateWithAuthFilter: true }, undefined)
 
       await postCreateOne()
 
-      expect(service.createOne).toHaveBeenCalledWith({ name: 'test' }, { filter: {} })
+      expect(service.createOne).toHaveBeenCalledWith({ name: 'test' }, undefined)
+    })
+
+    it('does not pass opts when validateWithAuthFilter is disabled for createOne', async () => {
+      const service = await setupApp({ validateWithAuthFilter: true, one: { validateWithAuthFilter: false } }, authorizedFilter)
+
+      await postCreateOne()
+
+      expect(service.createOne).toHaveBeenCalledWith({ name: 'test' }, undefined)
     })
 
     it('does not pass the auth filter into the query service when not enabled', async () => {
