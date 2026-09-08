@@ -4,7 +4,7 @@ import { SortDirection } from '@ptc-org/nestjs-query-core'
 import { CursorConnectionType, CursorPagingType, PagingStrategies, StaticConnectionType } from '@ptc-org/nestjs-query-graphql'
 import { plainToClass } from 'class-transformer'
 
-import { KeySet } from '../../../src/decorators'
+import { FilterableField, KeySet } from '../../../src/decorators'
 import { getOrCreateCursorConnectionType } from '../../../src/types/connection'
 import { getOrCreateCursorPagingType } from '../../../src/types/query/paging'
 import { generateSchema } from '../../__fixtures__'
@@ -713,6 +713,142 @@ describe('CursorConnectionType', (): void => {
           },
           totalCountFn: expect.any(Function)
         })
+      })
+    })
+  })
+  describe('keyset connection with date sort fields', () => {
+    @ObjectType('TestDated')
+    @KeySet(['id'])
+    class TestDatedDTO {
+      @FilterableField()
+      id!: number
+
+      @FilterableField()
+      dueDate!: Date
+
+      @FilterableField()
+      label!: string
+    }
+
+    function getDatedConnectionType(): StaticConnectionType<TestDatedDTO, PagingStrategies.CURSOR> {
+      return getOrCreateCursorConnectionType(TestDatedDTO, { pagingStrategy: PagingStrategies.CURSOR })
+    }
+
+    const keysetCursor = (fields: { field: string; value: unknown }[]): string =>
+      Buffer.from(JSON.stringify({ type: 'keyset', fields })).toString('base64')
+
+    const WALL_CLOCK_FORMAT = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}$/
+
+    it('should revive a legacy UTC ISO cursor value into a date for the filter', async () => {
+      const instant = new Date(Date.UTC(2026, 0, 3, 11, 30, 0, 0))
+      const queryMany = jest.fn()
+      queryMany.mockResolvedValueOnce([])
+      await getDatedConnectionType().createFromPromise(queryMany, {
+        sorting: [{ field: 'dueDate', direction: SortDirection.ASC }],
+        paging: createPage({
+          first: 2,
+          after: keysetCursor([
+            { field: 'dueDate', value: '2026-01-03T11:30:00.000Z' },
+            { field: 'id', value: 2 }
+          ])
+        })
+      })
+      expect(queryMany).toHaveBeenCalledWith({
+        filter: {
+          or: [{ and: [{ dueDate: { gt: instant } }] }, { and: [{ dueDate: { eq: instant } }, { id: { gt: 2 } }] }]
+        },
+        paging: { limit: 3 },
+        sorting: [
+          { field: 'dueDate', direction: SortDirection.ASC },
+          { field: 'id', direction: SortDirection.ASC }
+        ]
+      })
+    })
+
+    it('should mint date boundaries as a wall clock with the offset embedded', async () => {
+      const dtos = [
+        { id: 1, dueDate: new Date(Date.UTC(2026, 0, 3, 11, 30)), label: 'a' },
+        { id: 2, dueDate: new Date(Date.UTC(2026, 0, 4, 11, 30)), label: 'b' },
+        { id: 3, dueDate: new Date(Date.UTC(2026, 0, 5, 11, 30)), label: 'c' }
+      ]
+      const queryMany = jest.fn()
+      queryMany.mockResolvedValueOnce([...dtos])
+      const response = await getDatedConnectionType().createFromPromise(queryMany, {
+        sorting: [{ field: 'dueDate', direction: SortDirection.ASC }],
+        paging: createPage({ first: 2 })
+      })
+
+      const decoded = JSON.parse(Buffer.from(response.pageInfo.endCursor, 'base64').toString()) as {
+        fields: { field: string; value: string }[]
+      }
+      const dueDateValue = decoded.fields.find(({ field }) => field === 'dueDate').value
+      expect(dueDateValue).toMatch(WALL_CLOCK_FORMAT)
+      expect(new Date(dueDateValue.replace(' ', 'T')).getTime()).toBe(dtos[1].dueDate.getTime())
+    })
+
+    it('should pass a wall clock boundary through to the filter verbatim', async () => {
+      const dtos = [
+        { id: 1, dueDate: new Date(Date.UTC(2026, 0, 3, 11, 30)), label: 'a' },
+        { id: 2, dueDate: new Date(Date.UTC(2026, 0, 4, 11, 30)), label: 'b' },
+        { id: 3, dueDate: new Date(Date.UTC(2026, 0, 5, 11, 30)), label: 'c' }
+      ]
+      const queryMany = jest.fn()
+      queryMany.mockResolvedValueOnce([...dtos])
+      const response = await getDatedConnectionType().createFromPromise(queryMany, {
+        sorting: [{ field: 'dueDate', direction: SortDirection.ASC }],
+        paging: createPage({ first: 2 })
+      })
+      const decoded = JSON.parse(Buffer.from(response.pageInfo.endCursor, 'base64').toString()) as {
+        fields: { field: string; value: string }[]
+      }
+      const mintedWallClock = decoded.fields.find(({ field }) => field === 'dueDate').value
+
+      const queryManyNextPage = jest.fn()
+      queryManyNextPage.mockResolvedValueOnce([])
+      await getDatedConnectionType().createFromPromise(queryManyNextPage, {
+        sorting: [{ field: 'dueDate', direction: SortDirection.ASC }],
+        paging: createPage({ first: 2, after: response.pageInfo.endCursor })
+      })
+      expect(queryManyNextPage).toHaveBeenCalledWith({
+        filter: {
+          or: [
+            { and: [{ dueDate: { gt: mintedWallClock } }] },
+            { and: [{ dueDate: { eq: mintedWallClock } }, { id: { gt: 2 } }] }
+          ]
+        },
+        paging: { limit: 3 },
+        sorting: [
+          { field: 'dueDate', direction: SortDirection.ASC },
+          { field: 'id', direction: SortDirection.ASC }
+        ]
+      })
+    })
+
+    it('should never revive a date looking value on a field that is not a date', async () => {
+      const queryMany = jest.fn()
+      queryMany.mockResolvedValueOnce([])
+      await getDatedConnectionType().createFromPromise(queryMany, {
+        sorting: [{ field: 'label', direction: SortDirection.ASC }],
+        paging: createPage({
+          first: 2,
+          after: keysetCursor([
+            { field: 'label', value: '2026-01-03T11:30:00.000Z' },
+            { field: 'id', value: 2 }
+          ])
+        })
+      })
+      expect(queryMany).toHaveBeenCalledWith({
+        filter: {
+          or: [
+            { and: [{ label: { gt: '2026-01-03T11:30:00.000Z' } }] },
+            { and: [{ label: { eq: '2026-01-03T11:30:00.000Z' } }, { id: { gt: 2 } }] }
+          ]
+        },
+        paging: { limit: 3 },
+        sorting: [
+          { field: 'label', direction: SortDirection.ASC },
+          { field: 'id', direction: SortDirection.ASC }
+        ]
       })
     })
   })
