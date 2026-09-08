@@ -5,7 +5,9 @@ import {
   getFilterFields,
   Paging,
   Query,
-  SortField
+  SortDirection,
+  SortField,
+  SortNulls
 } from '@ptc-org/nestjs-query-core'
 import sequelize, {
   Association,
@@ -23,6 +25,22 @@ import { Model, ModelCtor } from 'sequelize-typescript'
 
 import { AggregateBuilder } from './aggregate.builder'
 import { WhereBuilder } from './where.builder'
+
+/**
+ * @internal
+ *
+ * Dialects that do not understand the `NULLS FIRST` / `NULLS LAST` order by syntax.
+ */
+const DIALECTS_WITHOUT_NULL_ORDERING = ['mysql', 'mariadb']
+
+/**
+ * @internal
+ *
+ * `col IS NULL` is 1 for nulls and 0 for everything else, so nulls come first when that key is sorted descending.
+ */
+function nullOrderingDirection(nulls: SortNulls): SortDirection {
+  return nulls === SortNulls.NULLS_FIRST ? SortDirection.DESC : SortDirection.ASC
+}
 
 /**
  * @internal
@@ -190,13 +208,18 @@ export class FilterQueryBuilder<Entity extends Model<Entity, Partial<Entity>>> {
       return qb
     }
     // eslint-disable-next-line no-param-reassign
-    qb.order = sorts.map(({ field, direction, nulls }): OrderItem => {
+    qb.order = sorts.flatMap(({ field, direction, nulls }): OrderItem[] => {
       const col = `${field as string}`
+
+      if (nulls && this.emulatesNullOrdering) {
+        return [this.nullOrderingItem(col, nulls), [col, direction]]
+      }
+
       const dir: string[] = [direction]
       if (nulls) {
         dir.push(nulls)
       }
-      return [col, dir.join(' ')]
+      return [[col, dir.join(' ')]]
     })
     return qb
   }
@@ -257,5 +280,18 @@ export class FilterQueryBuilder<Entity extends Model<Entity, Partial<Entity>>> {
 
   private get relationNames(): string[] {
     return Object.keys(this.model.associations || {})
+  }
+
+  /**
+   * @description Whether null ordering has to be expressed as an extra sort key because the dialect lacks the syntax.
+   */
+  private get emulatesNullOrdering(): boolean {
+    return DIALECTS_WITHOUT_NULL_ORDERING.includes(this.model.sequelize?.getDialect())
+  }
+
+  private nullOrderingItem(field: string, nulls: SortNulls): OrderItem {
+    const colName = this.model.rawAttributes[field].field ?? field
+    const quotedCol = this.model.sequelize.getQueryInterface().quoteIdentifier(colName)
+    return [sequelize.literal(`${quotedCol} IS NULL`), nullOrderingDirection(nulls)]
   }
 }
