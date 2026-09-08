@@ -26,6 +26,22 @@ describe('assertValidOnConditionPlacement', (): void => {
     expect(assertPlacement({ and: [{ testRelations: { on: { relationName: { eq: 'foo' } } } }] })).not.toThrow()
   })
 
+  it('should skip a non array and value', (): void => {
+    expect(
+      assertPlacement({
+        testRelations: { and: { on: { relationName: { eq: 'foo' } } } }
+      } as unknown as Filter<TestEntity>)
+    ).not.toThrow()
+  })
+
+  it('should skip a non array or value', (): void => {
+    expect(
+      assertPlacement({
+        testRelations: { or: { on: { relationName: { eq: 'foo' } } } }
+      } as unknown as Filter<TestEntity>)
+    ).not.toThrow()
+  })
+
   it('should reject join conditions at the root filter level', (): void => {
     expect(assertPlacement({ on: { stringType: { eq: 'foo' } } })).toThrow(
       '`on` conditions are only supported at the top level of a relation filter, not at the root filter level.'

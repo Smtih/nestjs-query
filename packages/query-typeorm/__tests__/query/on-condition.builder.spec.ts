@@ -62,6 +62,41 @@ describe('OnConditionBuilder', (): void => {
     expect(Object.values(params)).toEqual([10, 20])
   })
 
+  it('should spread an in comparison and bind the values as a single parameter', (): void => {
+    const { condition, params } = buildOnCondition({ numberType: { in: [1, 2, 3] } })
+
+    expect(withStableParamNames(condition)).toBe('TestEntity.numberType IN (:...param)')
+    expect(Object.values(params)).toEqual([[1, 2, 3]])
+  })
+
+  it('should spread a notIn comparison and bind the values as a single parameter', (): void => {
+    const { condition, params } = buildOnCondition({ numberType: { notIn: [1, 2, 3] } })
+
+    expect(withStableParamNames(condition)).toBe('TestEntity.numberType NOT IN (:...param)')
+    expect(Object.values(params)).toEqual([[1, 2, 3]])
+  })
+
+  it('should bind both bounds of a between comparison', (): void => {
+    const { condition, params } = buildOnCondition({ numberType: { between: { lower: 1, upper: 10 } } })
+
+    expect(withStableParamNames(condition)).toBe('TestEntity.numberType BETWEEN :param AND :param')
+    expect(Object.keys(params)).toHaveLength(2)
+    expect(Object.values(params)).toEqual([1, 10])
+  })
+
+  it('should keep both bounds of a between comparison when merged with another field', (): void => {
+    const { condition, params } = buildOnCondition({
+      numberType: { between: { lower: 1, upper: 10 } },
+      stringType: { eq: 'foo' }
+    })
+
+    expect(withStableParamNames(condition)).toBe(
+      '(TestEntity.numberType BETWEEN :param AND :param AND TestEntity.stringType = :param)'
+    )
+    expect(Object.keys(params)).toHaveLength(3)
+    expect(Object.values(params)).toEqual([1, 10, 'foo'])
+  })
+
   describe('and', (): void => {
     it('should and multiple expressions together', (): void => {
       const { condition } = buildOnCondition({ and: [{ boolType: { is: true } }, { dateType: { is: null } }] })

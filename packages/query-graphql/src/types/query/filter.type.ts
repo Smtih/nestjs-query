@@ -32,6 +32,8 @@ export type FilterableRelations = Record<string, Class<unknown>>
 export interface FilterConstructor<T> {
   hasRequiredFilters: boolean
 
+  prototype: object
+
   new (): Filter<T>
 }
 
@@ -60,7 +62,7 @@ function getFilterableRelations(relations: Record<string, ResolverRelation<unkno
  * ever declared once per type.
  */
 function addOnConditionField<T>(RelationFilter: FilterConstructor<T>, OnConditionFilter: FilterConstructor<T>): void {
-  const filterPrototype = (RelationFilter as unknown as { prototype: object }).prototype
+  const filterPrototype = RelationFilter.prototype
 
   if (filterTypesWithOnCondition.has(filterPrototype)) {
     return

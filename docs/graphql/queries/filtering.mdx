@@ -115,6 +115,8 @@ Both forms can be used on the same relation. Here the join only matches uncomple
 
 The generated `on` input accepts the relation's own fields plus `and` and `or`. It deliberately has no relation fields, since a join condition can only reference the relation being joined.
 
+Because the conditions are applied to a `LEFT JOIN`, a to-many relation yields one row per matching child, so an unpaged query can return the same parent more than once. Paged queries are not affected, because paging uses a distinct-id subquery. This is ordinary SQL join behaviour rather than anything specific to `on`, but `on` makes it easy to run into, since keeping every parent is the whole point.
+
 <Warning>
   `on` is only honoured at the top level of a relation filter. An `on` at the root filter level, or inside an `and`/`or`
   expression, has no join to attach to and is rejected with an error.

@@ -97,15 +97,19 @@ export interface NestedRelationsAliased {
 export class FilterQueryBuilder<Entity> {
   private readonly virtualColumns: string[] = []
 
+  /**
+   * Join conditions only ever qualify a joined relation's own fields, never this entity's, so the
+   * builder is given no repository — the same reason {@link WhereBuilder} builds relation filters
+   * with a repository-less builder of its own.
+   */
+  private readonly onConditionBuilder = new OnConditionBuilder<unknown>()
+
   constructor(
     readonly repo: Repository<Entity>,
     readonly whereBuilder: WhereBuilder<Entity> = new WhereBuilder<Entity>(
       new SQLComparisonBuilder<Entity>(SQLComparisonBuilder.DEFAULT_COMPARISON_MAP, repo)
     ),
-    readonly aggregateBuilder: AggregateBuilder<Entity> = new AggregateBuilder<Entity>(repo),
-    readonly onConditionBuilder: OnConditionBuilder<Entity> = new OnConditionBuilder<Entity>(
-      new SQLComparisonBuilder<Entity>(SQLComparisonBuilder.DEFAULT_COMPARISON_MAP, repo)
-    )
+    readonly aggregateBuilder: AggregateBuilder<Entity> = new AggregateBuilder<Entity>(repo)
   ) {
     this.virtualColumns = repo.metadata.columns
       .filter(({ isVirtualProperty }) => isVirtualProperty)
@@ -311,10 +315,7 @@ export class FilterQueryBuilder<Entity> {
     return referencedRelations.reduce((rqb, [relationKey, relation]) => {
       const relationAlias = relation.alias
       const relationChildren = relation.relations
-      const { condition, params } = this.onConditionBuilder.build(
-        relation.on as OnConditionFilter<Entity> | undefined,
-        relationAlias
-      )
+      const { condition, params } = this.onConditionBuilder.build(relation.on, relationAlias)
 
       const selectRelation = selectRelations && selectRelations.find(({ name }) => name === relationKey)
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
