@@ -76,8 +76,9 @@ const DRIVERS_WITHOUT_NULL_ORDERING = ['mysql', 'mariadb', 'aurora-mysql']
  *
  * `col IS NULL` is 1 for nulls and 0 for everything else, so nulls come first when that key is sorted descending.
  */
-function nullOrderingDirection(nulls: SortNulls): SortDirection {
-  return nulls === SortNulls.NULLS_FIRST ? SortDirection.DESC : SortDirection.ASC
+const NULL_ORDERING_DIRECTION: Record<SortNulls, SortDirection> = {
+  [SortNulls.NULLS_FIRST]: SortDirection.DESC,
+  [SortNulls.NULLS_LAST]: SortDirection.ASC
 }
 
 /**
@@ -245,7 +246,7 @@ export class FilterQueryBuilder<Entity> {
       }
 
       if (nulls && this.emulatesNullOrdering) {
-        return prevQb.addOrderBy(`${col} IS NULL`, nullOrderingDirection(nulls)).addOrderBy(col, direction)
+        return prevQb.addOrderBy(`${col} IS NULL`, NULL_ORDERING_DIRECTION[nulls]).addOrderBy(col, direction)
       }
 
       return prevQb.addOrderBy(col, direction, nulls)

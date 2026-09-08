@@ -38,8 +38,9 @@ const DIALECTS_WITHOUT_NULL_ORDERING = ['mysql', 'mariadb']
  *
  * `col IS NULL` is 1 for nulls and 0 for everything else, so nulls come first when that key is sorted descending.
  */
-function nullOrderingDirection(nulls: SortNulls): SortDirection {
-  return nulls === SortNulls.NULLS_FIRST ? SortDirection.DESC : SortDirection.ASC
+const NULL_ORDERING_DIRECTION: Record<SortNulls, SortDirection> = {
+  [SortNulls.NULLS_FIRST]: SortDirection.DESC,
+  [SortNulls.NULLS_LAST]: SortDirection.ASC
 }
 
 /**
@@ -292,6 +293,6 @@ export class FilterQueryBuilder<Entity extends Model<Entity, Partial<Entity>>> {
   private nullOrderingItem(field: string, nulls: SortNulls): OrderItem {
     const colName = this.model.rawAttributes[field].field ?? field
     const quotedCol = this.model.sequelize.getQueryInterface().quoteIdentifier(colName)
-    return [sequelize.literal(`${quotedCol} IS NULL`), nullOrderingDirection(nulls)]
+    return [sequelize.literal(`${quotedCol} IS NULL`), NULL_ORDERING_DIRECTION[nulls]]
   }
 }
