@@ -697,7 +697,7 @@ describe('CursorConnectionType', (): void => {
           paging: createPage({ first: 2, after: response.pageInfo.endCursor })
         })
         expect(queryManyNextPage).toHaveBeenCalledWith({
-          filter: { or: [{ and: [{ stringField: { gt: 'foo2' } }] }] },
+          filter: { or: [{ and: [{ or: [{ stringField: { gt: 'foo2' } }, { stringField: { is: null } }] }] }] },
           paging: { limit: 3 },
           sorting: [{ field: 'stringField', direction: SortDirection.ASC }]
         })
