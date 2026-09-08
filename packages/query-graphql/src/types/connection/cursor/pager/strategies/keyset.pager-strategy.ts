@@ -1,9 +1,20 @@
 import { BadRequestException } from '@nestjs/common'
-import { Class, Filter, invertSort, mergeFilter, Query, SortDirection, SortField, SortNulls } from '@ptc-org/nestjs-query-core'
+import {
+  Class,
+  Filter,
+  invertSort,
+  mergeFilter,
+  NullOrdering,
+  Query,
+  SortDirection,
+  SortField,
+  SortNulls
+} from '@ptc-org/nestjs-query-core'
 import { plainToClass } from 'class-transformer'
 
 import { getFilterableFields } from '../../../../../decorators/filterable-field.decorator'
 import { CursorPagingType } from '../../../../query'
+import { PageOptions } from '../../../interfaces'
 import { decodeBase64, encodeBase64, hasBeforeCursor, isBackwardPaging, isForwardPaging } from './helpers'
 import { KeySetCursorPayload, KeySetField, KeySetPagingOpts, PagerStrategy } from './pager-strategy'
 
@@ -43,7 +54,7 @@ export class KeysetPagerStrategy<DTO> implements PagerStrategy<DTO> {
     return !opts.payload || !opts.payload.fields.length
   }
 
-  createQuery<Q extends Query<DTO>>(query: Q, opts: KeySetPagingOpts<DTO>, includeExtraNode: boolean): Q {
+  createQuery<Q extends Query<DTO>>(query: Q, opts: KeySetPagingOpts<DTO>, includeExtraNode: boolean, pageOpts?: PageOptions): Q {
     const paging = { limit: opts.limit }
     if (includeExtraNode && (!this.enableFetchAllWithNegative || opts.limit !== -1)) {
       // Add 1 to the limit so we will fetch an additional node
@@ -51,7 +62,7 @@ export class KeysetPagerStrategy<DTO> implements PagerStrategy<DTO> {
     }
     const { payload } = opts
     const sorting = this.getSortFields(query, opts)
-    const filter = mergeFilter(query.filter ?? {}, this.createFieldsFilter(sorting, payload))
+    const filter = mergeFilter(query.filter ?? {}, this.createFieldsFilter(sorting, payload, pageOpts?.nullOrdering))
     const createdQuery = { ...query, filter, sorting, paging }
     if (this.enableFetchAllWithNegative && opts.limit === -1) delete createdQuery.paging
     return createdQuery
@@ -95,7 +106,11 @@ export class KeysetPagerStrategy<DTO> implements PagerStrategy<DTO> {
     }
   }
 
-  private createFieldsFilter(sortFields: SortField<DTO>[], payload: KeySetCursorPayload<DTO> | undefined): Filter<DTO> {
+  private createFieldsFilter(
+    sortFields: SortField<DTO>[],
+    payload: KeySetCursorPayload<DTO> | undefined,
+    nullOrdering: NullOrdering | undefined
+  ): Filter<DTO> {
     if (!payload) {
       return {}
     }
@@ -113,8 +128,9 @@ export class KeysetPagerStrategy<DTO> implements PagerStrategy<DTO> {
         )
       }
       const isAsc = sortField.direction === SortDirection.ASC
-      // postgres/oracle default: NULL sorts as largest, so ASC puts nulls last; explicit SortNulls overrides
-      const nullsLast = sortField.nulls ? sortField.nulls === SortNulls.NULLS_LAST : isAsc
+      // an explicit SortNulls is emitted into the ORDER BY, otherwise the engine's own placement decides
+      const nullsSortLargest = nullOrdering !== NullOrdering.NULLS_SMALLEST
+      const nullsLast = sortField.nulls ? sortField.nulls === SortNulls.NULLS_LAST : nullsSortLargest === isAsc
       const afterFilter = this.createAfterFilter(keySetField, isAsc, nullsLast)
       const precedingEqualities = [...equalities]
       if (keySetField.value === null) {

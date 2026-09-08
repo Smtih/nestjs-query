@@ -1,6 +1,6 @@
 // eslint-disable-next-line max-classes-per-file
 import { Field, ObjectType, Query, Resolver } from '@nestjs/graphql'
-import { SortDirection, SortNulls } from '@ptc-org/nestjs-query-core'
+import { NullOrdering, SortDirection, SortNulls } from '@ptc-org/nestjs-query-core'
 import { CursorConnectionType, CursorPagingType, PagingStrategies, StaticConnectionType } from '@ptc-org/nestjs-query-graphql'
 import { plainToClass } from 'class-transformer'
 
@@ -921,6 +921,146 @@ describe('CursorConnectionType', (): void => {
       })
       expect(response.edges).toEqual([])
       expect(response.pageInfo.hasNextPage).toBe(false)
+    })
+  })
+  describe('keyset connection over a store that sorts nulls smallest', () => {
+    @ObjectType('TestNullsSmallest')
+    @KeySet(['id'])
+    class TestNullsSmallestDTO {
+      @FilterableField()
+      id!: number
+
+      @FilterableField({ nullable: true })
+      nullableField!: string
+    }
+
+    const nullsSmallest = { nullOrdering: NullOrdering.NULLS_SMALLEST }
+
+    function getNullsSmallestConnectionType(): StaticConnectionType<TestNullsSmallestDTO, PagingStrategies.CURSOR> {
+      return getOrCreateCursorConnectionType(TestNullsSmallestDTO, { pagingStrategy: PagingStrategies.CURSOR })
+    }
+
+    const keysetCursor = (fields: { field: string; value: unknown }[]): string =>
+      Buffer.from(JSON.stringify({ type: 'keyset', fields })).toString('base64')
+
+    it('should leave the null block behind when paging past a non-null value on an ascending sort', async () => {
+      const queryMany = jest.fn()
+      queryMany.mockResolvedValueOnce([])
+      await getNullsSmallestConnectionType().createFromPromise(
+        queryMany,
+        {
+          sorting: [{ field: 'nullableField', direction: SortDirection.ASC }],
+          paging: createPage({
+            first: 2,
+            after: keysetCursor([
+              { field: 'nullableField', value: 'foo1' },
+              { field: 'id', value: 2 }
+            ])
+          })
+        },
+        undefined,
+        nullsSmallest
+      )
+      expect(queryMany).toHaveBeenCalledWith({
+        filter: {
+          or: [{ and: [{ nullableField: { gt: 'foo1' } }] }, { and: [{ nullableField: { eq: 'foo1' } }, { id: { gt: 2 } }] }]
+        },
+        paging: { limit: 3 },
+        sorting: [
+          { field: 'nullableField', direction: SortDirection.ASC },
+          { field: 'id', direction: SortDirection.ASC }
+        ]
+      })
+    })
+
+    it('should reach the non-null values when paging past a null on an ascending sort', async () => {
+      const queryMany = jest.fn()
+      queryMany.mockResolvedValueOnce([])
+      await getNullsSmallestConnectionType().createFromPromise(
+        queryMany,
+        {
+          sorting: [{ field: 'nullableField', direction: SortDirection.ASC }],
+          paging: createPage({
+            first: 2,
+            after: keysetCursor([
+              { field: 'nullableField', value: null },
+              { field: 'id', value: 5 }
+            ])
+          })
+        },
+        undefined,
+        nullsSmallest
+      )
+      expect(queryMany).toHaveBeenCalledWith({
+        filter: {
+          or: [{ and: [{ nullableField: { isNot: null } }] }, { and: [{ nullableField: { is: null } }, { id: { gt: 5 } }] }]
+        },
+        paging: { limit: 3 },
+        sorting: [
+          { field: 'nullableField', direction: SortDirection.ASC },
+          { field: 'id', direction: SortDirection.ASC }
+        ]
+      })
+    })
+
+    it('should honour an explicit nulls placement over what the store reports', async () => {
+      const queryMany = jest.fn()
+      queryMany.mockResolvedValueOnce([])
+      await getNullsSmallestConnectionType().createFromPromise(
+        queryMany,
+        {
+          sorting: [{ field: 'nullableField', direction: SortDirection.ASC, nulls: SortNulls.NULLS_LAST }],
+          paging: createPage({
+            first: 2,
+            after: keysetCursor([
+              { field: 'nullableField', value: null },
+              { field: 'id', value: 5 }
+            ])
+          })
+        },
+        undefined,
+        nullsSmallest
+      )
+      expect(queryMany).toHaveBeenCalledWith({
+        filter: {
+          or: [{ and: [{ nullableField: { is: null } }, { id: { gt: 5 } }] }]
+        },
+        paging: { limit: 3 },
+        sorting: [
+          { field: 'nullableField', direction: SortDirection.ASC, nulls: SortNulls.NULLS_LAST },
+          { field: 'id', direction: SortDirection.ASC }
+        ]
+      })
+    })
+
+    it('should keep the nulls-largest boundary when the store reports nothing', async () => {
+      const queryMany = jest.fn()
+      queryMany.mockResolvedValueOnce([])
+      await getNullsSmallestConnectionType().createFromPromise(
+        queryMany,
+        {
+          sorting: [{ field: 'nullableField', direction: SortDirection.ASC }],
+          paging: createPage({
+            first: 2,
+            after: keysetCursor([
+              { field: 'nullableField', value: null },
+              { field: 'id', value: 5 }
+            ])
+          })
+        },
+        undefined,
+        {}
+      )
+      expect(queryMany).toHaveBeenCalledWith({
+        filter: {
+          or: [{ and: [{ nullableField: { is: null } }, { id: { gt: 5 } }] }]
+        },
+        paging: { limit: 3 },
+        sorting: [
+          { field: 'nullableField', direction: SortDirection.ASC },
+          { field: 'id', direction: SortDirection.ASC }
+        ]
+      })
     })
   })
 })
