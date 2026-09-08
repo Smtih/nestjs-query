@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common'
 import { InjectModel, SequelizeModule } from '@nestjs/sequelize'
 import { Test, TestingModule } from '@nestjs/testing'
 import { DeepPartial } from '@ptc-org/nestjs-query-core'
@@ -1355,9 +1356,11 @@ describe('SequelizeQueryService', (): void => {
       await truncate(moduleRef.get(Sequelize))
       const entity = PLAIN_TEST_ENTITIES[0]
       const queryService = moduleRef.get(TestEntityService)
-      return expect(
-        queryService.createOne(entity, { filter: { stringType: { eq: PLAIN_TEST_ENTITIES[1].stringType } } })
-      ).rejects.toThrow('Entity does not meet creation constraints')
+      const createOnePromise = queryService.createOne(entity, {
+        filter: { stringType: { eq: PLAIN_TEST_ENTITIES[1].stringType } }
+      })
+      await expect(createOnePromise).rejects.toThrow('Entity does not meet creation constraints')
+      return expect(createOnePromise).rejects.toBeInstanceOf(BadRequestException)
     })
 
     it('should create an entity that matches the provided filter', async () => {

@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { getDataSourceToken, InjectRepository, TypeOrmModule } from '@nestjs/typeorm'
 import { Filter, SortDirection } from '@ptc-org/nestjs-query-core'
@@ -1994,9 +1995,9 @@ describe('TypeOrmQueryService', (): void => {
       await truncate(moduleRef.get(getDataSourceToken()))
       const entity = TEST_ENTITIES[0]
       const queryService = moduleRef.get(TestEntityService)
-      return expect(
-        queryService.createOne(entity, { filter: { stringType: { eq: TEST_ENTITIES[1].stringType } } })
-      ).rejects.toThrow('Entity does not meet creation constraints')
+      const createOnePromise = queryService.createOne(entity, { filter: { stringType: { eq: TEST_ENTITIES[1].stringType } } })
+      await expect(createOnePromise).rejects.toThrow('Entity does not meet creation constraints')
+      return expect(createOnePromise).rejects.toBeInstanceOf(BadRequestException)
     })
 
     it('should create an entity that matches the provided filter', async () => {

@@ -3,7 +3,6 @@ import {
   AggregateOptions,
   AggregateQuery,
   AggregateResponse,
-  applyFilter,
   Class,
   CountOptions,
   CreateManyOptions,
@@ -12,8 +11,10 @@ import {
   DeleteManyOptions,
   DeleteManyResponse,
   DeleteOneOptions,
+  ensureMatchesCreationFilter,
   Filter,
   Filterable,
+  filterCreatableRecords,
   FindByIdOptions,
   GetByIdOptions,
   Query,
@@ -200,11 +201,8 @@ export class TypeOrmQueryService<Entity>
    * @param opts - Additional options.
    */
   public async createOne(record: DeepPartial<Entity>, opts?: CreateOneOptions<Entity>): Promise<Entity> {
+    ensureMatchesCreationFilter(record as Entity, opts?.filter)
     const entity = await this.ensureIsEntityAndDoesNotExist(record)
-
-    if (opts?.filter && !applyFilter(entity, opts.filter)) {
-      throw new Error('Entity does not meet creation constraints')
-    }
 
     return this.repo.save(entity)
   }
@@ -223,8 +221,11 @@ export class TypeOrmQueryService<Entity>
    * @param opts - Additional options.
    */
   public async createMany(records: DeepPartial<Entity>[], opts?: CreateManyOptions<Entity>): Promise<Entity[]> {
-    const entities = await Promise.all(records.map((r) => this.ensureIsEntityAndDoesNotExist(r)))
-    return this.repo.save(opts?.filter ? applyFilter(entities, opts.filter) : entities)
+    const creatableRecords = filterCreatableRecords(records as Entity[], opts?.filter)
+    const entities = await Promise.all(
+      creatableRecords.map((creatableRecord) => this.ensureIsEntityAndDoesNotExist(creatableRecord as DeepPartial<Entity>))
+    )
+    return this.repo.save(entities)
   }
 
   /**

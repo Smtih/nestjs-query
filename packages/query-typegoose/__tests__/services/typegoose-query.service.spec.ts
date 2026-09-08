@@ -1,5 +1,6 @@
 /* eslint-disable no-underscore-dangle,@typescript-eslint/no-unsafe-return */
 import { InjectModel, TypegooseModule } from '@m8a/nestjs-typegoose'
+import { BadRequestException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
 import { FindRelationOptions, SortDirection } from '@ptc-org/nestjs-query-core'
 import { DocumentType, getModelForClass, mongoose } from '@typegoose/typegoose'
@@ -543,11 +544,11 @@ describe('TypegooseQueryService', () => {
       it('should reject if the entity does not match the filter', async () => {
         const entity = testEntityToCreate(TEST_ENTITIES[0])
         const queryService = moduleRef.get(TestEntityService)
-        return expect(
-          queryService.createOne(entity, {
-            filter: { stringType: { eq: TEST_ENTITIES[1].stringType } }
-          })
-        ).rejects.toThrow('Entity does not meet creation constraints')
+        const createOnePromise = queryService.createOne(entity, {
+          filter: { stringType: { eq: TEST_ENTITIES[1].stringType } }
+        })
+        await expect(createOnePromise).rejects.toThrow('Entity does not meet creation constraints')
+        return expect(createOnePromise).rejects.toBeInstanceOf(BadRequestException)
       })
     })
   })

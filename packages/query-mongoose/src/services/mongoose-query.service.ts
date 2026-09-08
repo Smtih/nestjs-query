@@ -3,13 +3,14 @@ import { NotFoundException } from '@nestjs/common'
 import {
   AggregateQuery,
   AggregateResponse,
-  applyFilter,
   CreateManyOptions,
   CreateOneOptions,
   DeepPartial,
   DeleteManyResponse,
   DeleteOneOptions,
+  ensureMatchesCreationFilter,
   Filter,
+  filterCreatableRecords,
   FindByIdOptions,
   GetByIdOptions,
   Query,
@@ -148,10 +149,8 @@ export class MongooseQueryService<Entity extends Document>
    * @param opts - Additional options.
    */
   async createOne(record: DeepPartial<Entity>, opts?: CreateOneOptions<Entity>): Promise<Entity> {
+    ensureMatchesCreationFilter(record as Entity, opts?.filter)
     this.ensureIdIsNotPresent(record)
-    if (opts?.filter && !applyFilter(record as Entity, opts.filter)) {
-      throw new Error('Entity does not meet creation constraints')
-    }
     return this.Model.create(record as Partial<Entity>)
   }
 
@@ -169,8 +168,8 @@ export class MongooseQueryService<Entity extends Document>
    * @param opts - Additional options.
    */
   public async createMany(records: DeepPartial<Entity>[], opts?: CreateManyOptions<Entity>): Promise<Entity[]> {
-    records.forEach((r) => this.ensureIdIsNotPresent(r))
-    const recordsToCreate = opts?.filter ? applyFilter(records as Entity[], opts.filter) : records
+    const recordsToCreate = filterCreatableRecords(records as Entity[], opts?.filter)
+    recordsToCreate.forEach((recordToCreate) => this.ensureIdIsNotPresent(recordToCreate as DeepPartial<Entity>))
     return this.Model.create(recordsToCreate as Partial<Entity>[])
   }
 
