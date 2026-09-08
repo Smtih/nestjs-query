@@ -116,6 +116,44 @@ const q: Query<MyClass> = {
 }
 ```
 
+### Relation Join Conditions[​](#relation-join-conditions 'Direct link to Relation Join Conditions')
+
+A relation filter also accepts an `on` key. Its conditions are added to that relation's SQL `JOIN ... ON` clause instead of the `WHERE` clause, which preserves `LEFT JOIN` semantics: parent records without a matching child are still returned.
+
+<Warning>This functionality only works for typeorm!</Warning>
+
+In this example every `myClass` is returned, and only its uncompleted `subTasks` take part in the join: `LEFT JOIN sub_task ON sub_task.my_class_id = my_class.id AND sub_task.completed = FALSE`.
+
+```ts
+const q: Query<MyClass> = {
+  filter: {
+    subTasks: {
+      on: { completed: { is: false } }
+    }
+  }
+}
+```
+
+Move the same condition out of `on` and it becomes a `WHERE` condition instead, which drops every `myClass` that has no uncompleted `subTask`. The two can be combined, so you can restrict what the join matches and still filter the parents:
+
+```ts
+const q: Query<MyClass> = {
+  filter: {
+    subTasks: {
+      on: { completed: { is: false } },
+      title: { like: '%urgent%' }
+    }
+  }
+}
+```
+
+Join conditions may be grouped with `and` and `or`, but they cannot reference further relations, because a join condition can only refer to the relation being joined.
+
+<Warning>
+  `on` is only honoured at the top level of a relation filter. An `on` at the root filter level, or inside an `and`/`or`
+  expression, has no join to attach to and is rejected with an error.
+</Warning>
+
 ---
 
 ## Paging[​](#paging 'Direct link to Paging')

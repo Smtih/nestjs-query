@@ -187,7 +187,7 @@ describe('FilterQueryBuilder', (): void => {
       const mockWhereBuilder = mock<WhereBuilder<TestEntity>>(WhereBuilder)
       const qb = getEntityQueryBuilder(TestEntity, instance(mockWhereBuilder))
       expect(qb.getReferencedRelationsRecursive(qb.repo.metadata, complexQuery)).toEqual({
-        oneTestRelation: { relationOfTestRelation: {} }
+        oneTestRelation: { children: { relationOfTestRelation: { children: {} } } }
       })
     })
     it('with nested and / or', () => {
@@ -226,7 +226,10 @@ describe('FilterQueryBuilder', (): void => {
             }
           ]
         } as Filter<TestEntity>)
-      ).toEqual({ testRelations: {}, oneTestRelation: { relationsOfTestRelation: {} } })
+      ).toEqual({
+        testRelations: { children: {} },
+        oneTestRelation: { children: { relationsOfTestRelation: { children: {} } } }
+      })
     })
   })
 
@@ -277,6 +280,79 @@ describe('FilterQueryBuilder', (): void => {
             }
           ]
         } as any)
+      })
+    })
+
+    describe('with relation join conditions', () => {
+      const expectJoinConditionSQLSnapshot = (query: Query<TestEntity>): void => {
+        expectSQLSnapshot(new FilterQueryBuilder(connection.getRepository(TestEntity)).select(query))
+      }
+
+      it('should add the join conditions to the LEFT JOIN instead of the WHERE clause', () => {
+        expectJoinConditionSQLSnapshot({
+          filter: { testRelations: { on: { relationName: { eq: 'foo' } } } }
+        })
+      })
+
+      it('should keep filtering in the WHERE clause for the same relation', () => {
+        expectJoinConditionSQLSnapshot({
+          filter: { testRelations: { on: { relationName: { eq: 'foo' } }, testRelationPk: { isNot: null } } }
+        })
+      })
+
+      it('should support boolean expressions inside the join conditions', () => {
+        expectJoinConditionSQLSnapshot({
+          filter: {
+            testRelations: {
+              on: { or: [{ relationName: { eq: 'foo' } }, { testEntityId: { is: null } }] }
+            }
+          }
+        })
+      })
+
+      it('should add the join conditions of a nested relation', () => {
+        expectJoinConditionSQLSnapshot({
+          filter: {
+            oneTestRelation: {
+              on: { relationName: { eq: 'foo' } },
+              relationsOfTestRelation: { on: { testRelationId: { is: null } } }
+            }
+          }
+        })
+      })
+
+      it('should merge the join conditions when the same relation is referenced twice', () => {
+        expectJoinConditionSQLSnapshot({
+          filter: {
+            and: [
+              { testRelations: { on: { relationName: { eq: 'foo' } } } },
+              { testRelations: { on: { testEntityId: { is: null } } } }
+            ]
+          }
+        })
+      })
+
+      it('should add the join conditions to a selected relation', () => {
+        expectJoinConditionSQLSnapshot({
+          filter: { oneTestRelation: { on: { relationName: { eq: 'foo' } } } },
+          relations: [{ name: 'oneTestRelation', query: {} }]
+        } as Query<TestEntity>)
+      })
+
+      it('should throw when join conditions are at the root filter level', () => {
+        expect(() => expectJoinConditionSQLSnapshot({ filter: { on: { stringType: { eq: 'foo' } } } })).toThrow(
+          '`on` conditions are only supported at the top level of a relation filter, not at the root filter level.'
+        )
+      })
+
+      it('should throw when join conditions are inside a boolean expression', () => {
+        expect(() =>
+          expectJoinConditionSQLSnapshot({
+            filter: { testRelations: { and: [{ on: { relationName: { eq: 'foo' } } }] } }
+          })
+        ).toThrow(
+          '`on` conditions are only supported at the top level of a relation filter, not inside an `and`/`or` expression.'
+        )
       })
     })
 

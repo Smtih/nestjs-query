@@ -65,6 +65,52 @@ type FilterGrouping<T> = {
 }
 
 /**
+ * Conditions that are injected into a relation's SQL `JOIN ... ON` clause instead of the `WHERE`
+ * clause.
+ *
+ * Only comparisons on the joined relation's own fields are allowed, optionally grouped with
+ * `and`/`or`. Nested relations are not, because a join condition can only reference the relation
+ * being joined.
+ *
+ * @example
+ * ```ts
+ * // LEFT JOIN "sub_task" ON "sub_task"."task_id" = "task"."id" AND ("sub_task"."completed" = FALSE)
+ * const filter: Filter<Task> = {
+ *   subTasks: {
+ *     on: { completed: { is: false } },
+ *   },
+ * }
+ * ```
+ *
+ * @typeparam T - the type of object the join condition applies to.
+ */
+export type OnConditionFilter<T> = FilterComparisons<T> & {
+  /**
+   * Group an array of join conditions with an AND operation.
+   */
+  and?: OnConditionFilter<T>[]
+  /**
+   * Group an array of join conditions with an OR operation.
+   */
+  or?: OnConditionFilter<T>[]
+}
+
+/**
+ * The join conditions of a relation filter.
+ */
+type FilterJoinConditions<T> = {
+  /**
+   * Conditions to inject into this relation's SQL `JOIN ... ON` clause rather than the `WHERE`
+   * clause, which preserves `LEFT JOIN` semantics so parent rows without a matching child are
+   * kept.
+   *
+   * Only honoured at the top level of a relation filter. An `on` at the root filter level, or
+   * inside an `and`/`or` expression, has no join to attach to and is rejected.
+   */
+  on?: OnConditionFilter<T>
+}
+
+/**
  * Filter for type T.
  *
  * @example
@@ -110,6 +156,16 @@ type FilterGrouping<T> = {
  * }
  * ```
  *
+ * @example
+ * ```ts
+ * // LEFT JOIN "sub_task" ON "sub_task"."task_id" = "task"."id" AND ("sub_task"."completed" = FALSE)
+ * const filter: Filter<Task> = {
+ *   subTasks: {
+ *     on: { completed: { is: false } },
+ *   },
+ * }
+ * ```
+ *
  * @typeparam T - the type of object to filter on.
  */
-export type Filter<T> = FilterGrouping<T> & FilterComparisons<T>
+export type Filter<T> = FilterGrouping<T> & FilterComparisons<T> & FilterJoinConditions<T>

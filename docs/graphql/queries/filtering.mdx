@@ -77,6 +77,49 @@ The following example filters for all todoItems that are marked completed.
 </Tab>
 </Tabs>
 
+## Filtering a relation join with `on`
+
+Filtering on a relation normally constrains the parent records: a `todoItem` is only returned when one of its `subTasks` matches. When you instead want to narrow which related records the join considers, while still returning every parent, put the conditions under `on`.
+
+Conditions under `on` are added to that relation's SQL `JOIN ... ON` clause rather than the `WHERE` clause, so the `LEFT JOIN` keeps parents that have no matching child.
+
+<Warning>This functionality only works for typeorm!</Warning>
+
+```graphql
+{
+  todoItems(filter: { subTasks: { on: { completed: { is: false } } } }) {
+    edges {
+      node {
+        id
+        title
+      }
+    }
+  }
+}
+```
+
+Both forms can be used on the same relation. Here the join only matches uncompleted `subTasks`, and the `WHERE` clause then keeps only the `todoItems` that have such a subtask with a matching title:
+
+```graphql
+{
+  todoItems(filter: { subTasks: { on: { completed: { is: false } }, title: { like: "%urgent%" } } }) {
+    edges {
+      node {
+        id
+        title
+      }
+    }
+  }
+}
+```
+
+The generated `on` input accepts the relation's own fields plus `and` and `or`. It deliberately has no relation fields, since a join condition can only reference the relation being joined.
+
+<Warning>
+  `on` is only honoured at the top level of a relation filter. An `on` at the root filter level, or inside an `and`/`or`
+  expression, has no join to attach to and is rejected with an error.
+</Warning>
+
 ## Setting the generated filter-type depth
 
 When querying the default filter is one level deep. You can specify the generated filter-type depth by using the `QueryOptions` decorator on your DTO.

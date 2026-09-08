@@ -1,6 +1,6 @@
 import { Filter, FilterComparisons, FilterFieldComparison } from '../interfaces'
 import { ComparisonBuilder } from './comparison.builder'
-import { getFilterFieldComparison, isComparison } from './filter.helpers'
+import { getFilterFieldComparison, isComparison, ON_CONDITION_KEY } from './filter.helpers'
 import { ComparisonField, FilterFn } from './types'
 
 export class FilterBuilder {
@@ -32,7 +32,7 @@ export class FilterBuilder {
   private static filterFieldsOrNested<DTO>(filter: Filter<DTO>): FilterFn<DTO> {
     return this.andFilterFn(
       ...Object.keys(filter)
-        .filter((k) => k !== 'and' && k !== 'or')
+        .filter((k) => k !== 'and' && k !== 'or' && k !== ON_CONDITION_KEY)
         .map((fieldOrNested) => this.withComparison(filter, fieldOrNested as keyof DTO))
     )
   }

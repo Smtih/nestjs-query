@@ -15,6 +15,12 @@ const reflector = new MapReflector('nestjs-query:filter-type')
 // e.g. if there is a circular reference in the relations
 //      `User -> Post -> User-> Post -> ...`
 const internalCache = new Map<Class<unknown>, Map<string, FilterConstructor<unknown>>>()
+// filter types are memoized and can be reached through more than one relation, so the `on` field
+// is only ever declared once per type
+const filterTypesWithOnCondition = new WeakSet<object>()
+
+const ON_CONDITION_FIELD = 'on'
+const ON_CONDITION_TYPE_SUFFIX = 'OnCondition'
 
 export type FilterTypeOptions = {
   allowedBooleanExpressions?: ('and' | 'or')[]
@@ -42,6 +48,35 @@ function getFilterableRelations(relations: Record<string, ResolverRelation<unkno
     }
   })
   return filterableRelations
+}
+
+/**
+ * Adds the `on` field to a filter type that is used as a relation filter.
+ *
+ * Conditions under `on` end up in the relation's `JOIN ... ON` clause, so the field is typed with a
+ * depth zero filter and therefore cannot itself reference further relations.
+ *
+ * Filter types are memoized and can be reached through more than one relation, so the field is only
+ * ever declared once per type.
+ */
+function addOnConditionField<T>(RelationFilter: FilterConstructor<T>, OnConditionFilter: FilterConstructor<T>): void {
+  const filterPrototype = (RelationFilter as unknown as { prototype: object }).prototype
+
+  if (filterTypesWithOnCondition.has(filterPrototype)) {
+    return
+  }
+  filterTypesWithOnCondition.add(filterPrototype)
+
+  ValidateNested()(filterPrototype, ON_CONDITION_FIELD)
+  Field(() => OnConditionFilter, {
+    nullable: true,
+    description:
+      "Conditions injected into this relation's JOIN ON clause rather than the WHERE clause, " +
+      'preserving LEFT JOIN semantics so parent rows without a matching child are kept. Only ' +
+      'honoured at the top level of a relation filter: an `on` placed at the root filter level or ' +
+      'inside an `and`/`or` expression is rejected.'
+  })(filterPrototype, ON_CONDITION_FIELD)
+  Type(() => OnConditionFilter)(filterPrototype, ON_CONDITION_FIELD)
 }
 
 function getOrCreateFilterType<T>(
@@ -136,6 +171,8 @@ function getOrCreateFilterType<T>(
 
         if (FieldType) {
           const FC = getOrCreateFilterType(FieldType, newPrefix, suffix, depth - 1)
+
+          addOnConditionField(FC, getOrCreateFilterType(FieldType, '', ON_CONDITION_TYPE_SUFFIX, 0))
 
           ValidateNested()(GraphQLFilter.prototype, field)
           Field(() => FC, { nullable: true })(GraphQLFilter.prototype, field)
