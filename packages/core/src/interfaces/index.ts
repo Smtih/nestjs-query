@@ -1,6 +1,7 @@
 export * from './aggregate-options.interface'
 export * from './aggregate-query.interface'
 export * from './aggregate-response.interface'
+export * from './auth-validation-opts.interface'
 export * from './count-options.interface'
 export * from './create-many-options.interface'
 export * from './create-one-options.interface'

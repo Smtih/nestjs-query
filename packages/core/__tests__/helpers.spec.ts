@@ -1,10 +1,13 @@
+import { BadRequestException } from '@nestjs/common'
 import {
   AggregateResponse,
   applyFilter,
   applyPaging,
   applyQuery,
   applySort,
+  ensureMatchesCreationFilter,
   Filter,
+  filterCreatableRecords,
   getFilterComparisons,
   getFilterFields,
   getFilterOmitting,
@@ -1613,5 +1616,43 @@ describe('mergeFilters', () => {
     }
     expect(mergeFilters(filter, {})).toEqual({ and: [filter] })
     expect(mergeFilters({}, filter)).toEqual({ and: [filter] })
+  })
+})
+
+describe('ensureMatchesCreationFilter', () => {
+  const filter: Filter<TestDTO> = { first: { eq: 'foo' } }
+
+  it('should do nothing when the filter is undefined', () => {
+    expect(() => ensureMatchesCreationFilter({ first: 'bar' }, undefined)).not.toThrow()
+  })
+
+  it('should do nothing when the record matches the filter', () => {
+    expect(() => ensureMatchesCreationFilter({ first: 'foo' }, filter)).not.toThrow()
+  })
+
+  it('should throw a BadRequestException when the record does not match the filter', () => {
+    expect(() => ensureMatchesCreationFilter({ first: 'bar' }, filter)).toThrow(
+      new BadRequestException('Entity does not meet creation constraints')
+    )
+  })
+})
+
+describe('filterCreatableRecords', () => {
+  const filter: Filter<TestDTO> = { first: { eq: 'foo' } }
+
+  it('should return the records unchanged when the filter is undefined', () => {
+    const records: TestDTO[] = [{ first: 'foo' }, { first: 'bar' }]
+    expect(filterCreatableRecords(records, undefined)).toBe(records)
+  })
+
+  it('should return only the records matching the filter', () => {
+    const matchingRecord: TestDTO = { first: 'foo' }
+    const nonMatchingRecord: TestDTO = { first: 'bar' }
+    expect(filterCreatableRecords([matchingRecord, nonMatchingRecord], filter)).toEqual([matchingRecord])
+  })
+
+  it('should return all records when every record matches the filter', () => {
+    const records: TestDTO[] = [{ first: 'foo' }, { first: 'foo' }, { first: 'foo' }]
+    expect(filterCreatableRecords(records, filter)).toEqual(records)
   })
 })
