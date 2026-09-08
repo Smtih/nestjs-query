@@ -13,6 +13,7 @@ import {
   Filterable,
   FindByIdOptions,
   GetByIdOptions,
+  NullOrdering,
   Query,
   QueryOptions,
   QueryService,
@@ -23,7 +24,7 @@ import { DeleteResult, FindOptionsWhere, Repository } from 'typeorm'
 import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity'
 import { UpdateResult } from 'typeorm/query-builder/result/UpdateResult'
 
-import { AggregateBuilder, FilterQueryBuilder } from '../query'
+import { AggregateBuilder, driverNullOrdering, FilterQueryBuilder } from '../query'
 import { RelationQueryService } from './relation-query.service'
 
 export interface TypeOrmQueryServiceOpts<Entity> {
@@ -68,6 +69,10 @@ export class TypeOrmQueryService<Entity>
   // eslint-disable-next-line @typescript-eslint/naming-convention
   public get EntityClass(): Class<Entity> {
     return this.repo.target as Class<Entity>
+  }
+
+  public get nullOrdering(): NullOrdering | undefined {
+    return driverNullOrdering(this.repo?.manager?.connection?.options?.type)
   }
 
   /**
