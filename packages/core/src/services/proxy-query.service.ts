@@ -11,6 +11,7 @@ import {
   FindRelationOptions,
   GetByIdOptions,
   ModifyRelationOptions,
+  NullOrdering,
   Query,
   QueryOptions,
   UpdateManyResponse,
@@ -20,6 +21,10 @@ import { QueryService } from './query.service'
 
 export class ProxyQueryService<DTO, C = DeepPartial<DTO>, U = DeepPartial<DTO>> implements QueryService<DTO, C, U> {
   constructor(readonly proxied: QueryService<DTO, C, U>) {}
+
+  public get nullOrdering(): NullOrdering | undefined {
+    return this.proxied.nullOrdering
+  }
 
   public addRelations<Relation>(
     relationName: string,
