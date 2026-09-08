@@ -1,12 +1,15 @@
 import { BadRequestException } from '@nestjs/common'
-import { Class, Filter, invertSort, mergeFilter, Query, SortDirection, SortField } from '@ptc-org/nestjs-query-core'
+import { Class, Filter, invertSort, mergeFilter, Query, SortDirection, SortField, SortNulls } from '@ptc-org/nestjs-query-core'
 import { plainToClass } from 'class-transformer'
 
+import { getFilterableFields } from '../../../../../decorators/filterable-field.decorator'
 import { CursorPagingType } from '../../../../query'
 import { decodeBase64, encodeBase64, hasBeforeCursor, isBackwardPaging, isForwardPaging } from './helpers'
-import { KeySetCursorPayload, KeySetPagingOpts, PagerStrategy } from './pager-strategy'
+import { KeySetCursorPayload, KeySetField, KeySetPagingOpts, PagerStrategy } from './pager-strategy'
 
 export class KeysetPagerStrategy<DTO> implements PagerStrategy<DTO> {
+  private nonNullableFields?: Set<string>
+
   constructor(
     readonly DTOClass: Class<DTO>,
     readonly pageFields: (keyof DTO)[],
@@ -100,23 +103,70 @@ export class KeysetPagerStrategy<DTO> implements PagerStrategy<DTO> {
     const equalities: Filter<DTO>[] = []
     const oredFilter = sortFields.reduce((dtoFilters, sortField, index) => {
       const keySetField = fields[index]
+      // A cursor created for a shorter sort, or a tampered cursor, would dereference undefined here.
+      if (!keySetField || typeof keySetField.field !== 'string') {
+        throw new BadRequestException('Invalid cursor')
+      }
       if (keySetField.field !== sortField.field) {
-        throw new Error(
-          `Cursor Payload does not match query sort expected ${keySetField.field as string} found ${sortField.field as string}`
+        throw new BadRequestException(
+          `Cursor Payload does not match query sort expected ${keySetField.field} found ${sortField.field as string}`
         )
       }
       const isAsc = sortField.direction === SortDirection.ASC
-      const subFilter = {
-        and: [...equalities, { [keySetField.field]: { [isAsc ? 'gt' : 'lt']: keySetField.value } }]
-      } as Filter<DTO>
+      // postgres/oracle default: NULL sorts as largest, so ASC puts nulls last; explicit SortNulls overrides
+      const nullsLast = sortField.nulls ? sortField.nulls === SortNulls.NULLS_LAST : isAsc
+      const afterFilter = this.createAfterFilter(keySetField, isAsc, nullsLast)
+      const precedingEqualities = [...equalities]
       if (keySetField.value === null) {
         equalities.push({ [keySetField.field]: { is: null } } as Filter<DTO>)
       } else {
         equalities.push({ [keySetField.field]: { eq: keySetField.value } } as Filter<DTO>)
       }
-      return [...dtoFilters, subFilter]
+      // Nothing sorts after a null boundary when nulls are placed last.
+      if (!afterFilter) {
+        return dtoFilters
+      }
+      return [...dtoFilters, { and: [...precedingEqualities, afterFilter] } as Filter<DTO>]
     }, [] as Filter<DTO>[])
     return { or: oredFilter } as Filter<DTO>
+  }
+
+  /**
+   * @description
+   * Builds "strictly after the cursor" for one sort field. A `gt`/`lt` comparison against NULL
+   * matches nothing, so a null boundary uses `is`/`isNot` instead, and a non-null boundary
+   * includes the null block when nulls sort after values.
+   */
+  private createAfterFilter(
+    keySetField: KeySetField<DTO, keyof DTO>,
+    isAsc: boolean,
+    nullsLast: boolean
+  ): Filter<DTO> | undefined {
+    const { field, value } = keySetField
+    if (value === null) {
+      return nullsLast ? undefined : ({ [field]: { isNot: null } } as Filter<DTO>)
+    }
+    const comparison = { [field]: { [isAsc ? 'gt' : 'lt']: value } } as unknown as Filter<DTO>
+    if (!nullsLast || !this.isNullableField(field)) {
+      return comparison
+    }
+    return { or: [comparison, { [field]: { is: null } }] } as Filter<DTO>
+  }
+
+  /**
+   * @description
+   * Whether a sort field can hold NULL, from `@FilterableField` metadata. A field that cannot
+   * never needs the `is: null` arm of the boundary. A DTO with no filterable metadata at all is
+   * treated as all-nullable so a metadata gap can never drop rows.
+   */
+  private isNullableField(field: keyof DTO): boolean {
+    if (!this.nonNullableFields) {
+      const filterableFields = getFilterableFields(this.DTOClass)
+      this.nonNullableFields = new Set(
+        filterableFields.filter((f) => f.advancedOptions?.nullable !== true).map((f) => f.propertyName)
+      )
+    }
+    return !this.nonNullableFields.has(field as string)
   }
 
   /**
