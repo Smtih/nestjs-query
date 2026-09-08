@@ -91,3 +91,22 @@ Ensure the request has a user before the authorizer runs:
 ```
 
 Guards and authorizers can also be scoped through the `read`, `create`, `update`, `delete`, and `export` operation options.
+
+## Applying auth filters on creation[​](#applying-auth-filters-on-creation 'Direct link to Applying auth filters on creation')
+
+The authorizer runs for `createOne`, but by default the filter it returns is not enforced against the request body; the authorizer can only reject a create by throwing, as shown above. Set `validateWithAuthFilter` in the `create` options to also enforce the filter:
+
+```ts
+{
+  DTOClass: TodoItemDTO,
+  EntityClass: TodoItemEntity,
+  create: { validateWithAuthFilter: true }
+}
+```
+
+The filter is passed to the query service, which evaluates it in JS against the request body before saving. A body that does not match the filter, for example an `ownerId` different from `request.user.id`, fails with `Entity does not meet creation constraints`.
+
+<Warning>
+  The filter is evaluated in JS against the flat request body, so filter clauses on relations, or on fields populated by the
+  database (such as `createdAt`, generated ids, or column defaults), cannot be checked and will not match.
+</Warning>
