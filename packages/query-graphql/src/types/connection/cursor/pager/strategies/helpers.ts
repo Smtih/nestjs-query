@@ -20,7 +20,7 @@ export function decodeBase64(str: string): string {
   return Buffer.from(str, 'base64').toString('utf8')
 }
 
-const LEGACY_UTC_CURSOR_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/
+const LEGACY_UTC_CURSOR_DATE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
 
 const pad = (num: number): string => String(num).padStart(2, '0')
 
@@ -49,5 +49,6 @@ export function reviveLegacyCursorDate(value: string): Date | string {
     return value
   }
   const revived = new Date(value)
-  return Number.isNaN(revived.getTime()) ? value : revived
+  // only strings toISOString could have minted revive; parser rollovers like 2026-02-30 pass through
+  return !Number.isNaN(revived.getTime()) && revived.toISOString() === value ? revived : value
 }

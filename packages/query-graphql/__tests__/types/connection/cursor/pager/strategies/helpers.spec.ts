@@ -69,6 +69,12 @@ describe('keyset cursor date helpers', () => {
       expect(reviveLegacyCursorDate('2026-99-99T99:99:99.000Z')).toBe('2026-99-99T99:99:99.000Z')
     })
 
+    it('leaves a calendar invalid string untouched rather than letting the parser roll it over', () => {
+      expect(reviveLegacyCursorDate('2026-02-30T10:20:30.000Z')).toBe('2026-02-30T10:20:30.000Z')
+      expect(reviveLegacyCursorDate('2025-02-29T10:20:30.000Z')).toBe('2025-02-29T10:20:30.000Z')
+      expect(reviveLegacyCursorDate('2026-01-15T24:00:00.000Z')).toBe('2026-01-15T24:00:00.000Z')
+    })
+
     it('leaves values that are not legacy date strings untouched', () => {
       expect(reviveLegacyCursorDate('foo')).toBe('foo')
       expect(reviveLegacyCursorDate('2026-01-03')).toBe('2026-01-03')

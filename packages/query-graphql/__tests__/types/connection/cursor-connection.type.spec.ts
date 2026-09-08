@@ -824,6 +824,98 @@ describe('CursorConnectionType', (): void => {
       })
     })
 
+    it('should revive a legacy cursor on a backward page into an inverted date boundary', async () => {
+      const instant = new Date(Date.UTC(2026, 0, 3, 11, 30, 0, 0))
+      const queryMany = jest.fn()
+      queryMany.mockResolvedValueOnce([])
+      await getDatedConnectionType().createFromPromise(queryMany, {
+        sorting: [{ field: 'dueDate', direction: SortDirection.ASC }],
+        paging: createPage({
+          last: 2,
+          before: keysetCursor([
+            { field: 'dueDate', value: '2026-01-03T11:30:00.000Z' },
+            { field: 'id', value: 2 }
+          ])
+        })
+      })
+      expect(queryMany).toHaveBeenCalledWith({
+        filter: {
+          or: [{ and: [{ dueDate: { lt: instant } }] }, { and: [{ dueDate: { eq: instant } }, { id: { lt: 2 } }] }]
+        },
+        paging: { limit: 3 },
+        sorting: [
+          { field: 'dueDate', direction: SortDirection.DESC },
+          { field: 'id', direction: SortDirection.DESC }
+        ]
+      })
+    })
+
+    it('should pass a wall clock boundary through verbatim on a backward page', async () => {
+      const mintedWallClock = '2026-01-04 22:30:00.000+11:00'
+      const queryMany = jest.fn()
+      queryMany.mockResolvedValueOnce([])
+      await getDatedConnectionType().createFromPromise(queryMany, {
+        sorting: [{ field: 'dueDate', direction: SortDirection.ASC }],
+        paging: createPage({
+          last: 2,
+          before: keysetCursor([
+            { field: 'dueDate', value: mintedWallClock },
+            { field: 'id', value: 2 }
+          ])
+        })
+      })
+      expect(queryMany).toHaveBeenCalledWith({
+        filter: {
+          or: [
+            { and: [{ dueDate: { lt: mintedWallClock } }] },
+            { and: [{ dueDate: { eq: mintedWallClock } }, { id: { lt: 2 } }] }
+          ]
+        },
+        paging: { limit: 3 },
+        sorting: [
+          { field: 'dueDate', direction: SortDirection.DESC },
+          { field: 'id', direction: SortDirection.DESC }
+        ]
+      })
+    })
+
+    it('should pass a minted wall clock through verbatim on a key set date field with no filterable metadata', async () => {
+      @ObjectType('TestPlainDateKeySet')
+      @KeySet(['createdAt'])
+      class TestPlainDateKeySetDTO {
+        @Field()
+        createdAt!: Date
+      }
+      const ConnectionType = getOrCreateCursorConnectionType(TestPlainDateKeySetDTO, {
+        pagingStrategy: PagingStrategies.CURSOR
+      })
+
+      const dtos = [
+        { createdAt: new Date(Date.UTC(2026, 0, 3, 11, 30)) },
+        { createdAt: new Date(Date.UTC(2026, 0, 4, 11, 30)) },
+        { createdAt: new Date(Date.UTC(2026, 0, 5, 11, 30)) }
+      ]
+      const queryMany = jest.fn()
+      queryMany.mockResolvedValueOnce([...dtos])
+      const response = await ConnectionType.createFromPromise(queryMany, { paging: createPage({ first: 2 }) })
+      const decoded = JSON.parse(Buffer.from(response.pageInfo.endCursor, 'base64').toString()) as {
+        fields: { field: string; value: string }[]
+      }
+      const mintedWallClock = decoded.fields.find(({ field }) => field === 'createdAt').value
+      expect(mintedWallClock).toMatch(WALL_CLOCK_FORMAT)
+
+      const queryManyNextPage = jest.fn()
+      queryManyNextPage.mockResolvedValueOnce([])
+      await ConnectionType.createFromPromise(queryManyNextPage, {
+        paging: createPage({ first: 2, after: response.pageInfo.endCursor })
+      })
+      expect(queryManyNextPage).toHaveBeenCalledWith({
+        filter: { or: [{ and: [{ createdAt: { gt: mintedWallClock } }] }] },
+        paging: { limit: 3 },
+        sorting: [{ field: 'createdAt', direction: SortDirection.ASC }]
+      })
+    })
+
     it('should never revive a date looking value on a field that is not a date', async () => {
       const queryMany = jest.fn()
       queryMany.mockResolvedValueOnce([])
