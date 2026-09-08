@@ -894,5 +894,33 @@ describe('CursorConnectionType', (): void => {
       ).rejects.toThrow('Cursor Payload does not match query sort expected id found nullableField')
       expect(queryMany).not.toHaveBeenCalled()
     })
+
+    it('should terminate paging with a no-match filter when every boundary arm is dropped', async () => {
+      @ObjectType('TestNullableKeySet')
+      @KeySet(['nullableField'])
+      class TestNullableKeySetDTO {
+        @FilterableField({ nullable: true })
+        nullableField!: string
+      }
+      const ConnectionType = getOrCreateCursorConnectionType(TestNullableKeySetDTO, {
+        pagingStrategy: PagingStrategies.CURSOR
+      })
+
+      const queryMany = jest.fn()
+      queryMany.mockResolvedValueOnce([])
+      const response = await ConnectionType.createFromPromise(queryMany, {
+        paging: createPage({
+          first: 2,
+          after: keysetCursor([{ field: 'nullableField', value: null }])
+        })
+      })
+      expect(queryMany).toHaveBeenCalledWith({
+        filter: { and: [{ nullableField: { is: null } }, { nullableField: { isNot: null } }] },
+        paging: { limit: 3 },
+        sorting: [{ field: 'nullableField', direction: SortDirection.ASC }]
+      })
+      expect(response.edges).toEqual([])
+      expect(response.pageInfo.hasNextPage).toBe(false)
+    })
   })
 })

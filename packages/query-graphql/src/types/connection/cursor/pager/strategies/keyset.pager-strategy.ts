@@ -128,6 +128,11 @@ export class KeysetPagerStrategy<DTO> implements PagerStrategy<DTO> {
       }
       return [...dtoFilters, { and: [...precedingEqualities, afterFilter] } as Filter<DTO>]
     }, [] as Filter<DTO>[])
+    if (oredFilter.length === 0) {
+      // every arm was dropped (all-null nulls-last boundary); an empty `or` is ignored by the adapters and would re-serve page one
+      const { field } = sortFields[0]
+      return { and: [{ [field]: { is: null } }, { [field]: { isNot: null } }] } as Filter<DTO>
+    }
     return { or: oredFilter } as Filter<DTO>
   }
 
