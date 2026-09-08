@@ -83,6 +83,54 @@ describe('CreateResolver', () => {
       const result = await resolver.createOne({ input: args })
       return expect(result).toEqual(output)
     })
+
+    it('should call the service createOne with an empty auth filter when validateWithAuthFilter is enabled on the resolver', async () => {
+      const { resolver, mockService } = await createTestResolver({ validateWithAuthFilter: true })
+      const args: CreateOneInputType<DeepPartial<TestResolverDTO>> = {
+        input: {
+          stringField: 'foo'
+        }
+      }
+      const output: TestResolverDTO = {
+        id: 'id-1',
+        stringField: 'foo'
+      }
+      when(mockService.createOne(objectContaining(args.input), deepEqual({ filter: {} }))).thenResolve(output)
+      const result = await resolver.createOne({ input: args })
+      return expect(result).toEqual(output)
+    })
+
+    it('should call the service createOne with an empty auth filter when validateWithAuthFilter is enabled for createOne', async () => {
+      const { resolver, mockService } = await createTestResolver({ one: { validateWithAuthFilter: true } })
+      const args: CreateOneInputType<DeepPartial<TestResolverDTO>> = {
+        input: {
+          stringField: 'foo'
+        }
+      }
+      const output: TestResolverDTO = {
+        id: 'id-1',
+        stringField: 'foo'
+      }
+      when(mockService.createOne(objectContaining(args.input), deepEqual({ filter: {} }))).thenResolve(output)
+      const result = await resolver.createOne({ input: args })
+      return expect(result).toEqual(output)
+    })
+
+    it('should call the service createOne without opts when validateWithAuthFilter is only enabled for createMany', async () => {
+      const { resolver, mockService } = await createTestResolver({ many: { validateWithAuthFilter: true } })
+      const args: CreateOneInputType<DeepPartial<TestResolverDTO>> = {
+        input: {
+          stringField: 'foo'
+        }
+      }
+      const output: TestResolverDTO = {
+        id: 'id-1',
+        stringField: 'foo'
+      }
+      when(mockService.createOne(objectContaining(args.input), undefined)).thenResolve(output)
+      const result = await resolver.createOne({ input: args })
+      return expect(result).toEqual(output)
+    })
   })
 
   describe('#createMany', () => {
@@ -97,6 +145,66 @@ describe('CreateResolver', () => {
 
     it('should call the service createMany with the provided input', async () => {
       const { resolver, mockService } = await createTestResolver()
+      const args: CreateManyInputType<Partial<TestResolverDTO>> = {
+        input: [
+          {
+            stringField: 'foo'
+          }
+        ]
+      }
+      const output: TestResolverDTO[] = [
+        {
+          id: 'id-1',
+          stringField: 'foo'
+        }
+      ]
+      when(mockService.createMany(objectContaining(args.input), undefined)).thenResolve(output)
+      const result = await resolver.createMany({ input: args })
+      return expect(result).toEqual(output)
+    })
+
+    it('should call the service createMany with an empty auth filter when validateWithAuthFilter is enabled on the resolver', async () => {
+      const { resolver, mockService } = await createTestResolver({ validateWithAuthFilter: true })
+      const args: CreateManyInputType<Partial<TestResolverDTO>> = {
+        input: [
+          {
+            stringField: 'foo'
+          }
+        ]
+      }
+      const output: TestResolverDTO[] = [
+        {
+          id: 'id-1',
+          stringField: 'foo'
+        }
+      ]
+      when(mockService.createMany(objectContaining(args.input), deepEqual({ filter: {} }))).thenResolve(output)
+      const result = await resolver.createMany({ input: args })
+      return expect(result).toEqual(output)
+    })
+
+    it('should call the service createMany with an empty auth filter when validateWithAuthFilter is enabled for createMany', async () => {
+      const { resolver, mockService } = await createTestResolver({ many: { validateWithAuthFilter: true } })
+      const args: CreateManyInputType<Partial<TestResolverDTO>> = {
+        input: [
+          {
+            stringField: 'foo'
+          }
+        ]
+      }
+      const output: TestResolverDTO[] = [
+        {
+          id: 'id-1',
+          stringField: 'foo'
+        }
+      ]
+      when(mockService.createMany(objectContaining(args.input), deepEqual({ filter: {} }))).thenResolve(output)
+      const result = await resolver.createMany({ input: args })
+      return expect(result).toEqual(output)
+    })
+
+    it('should call the service createMany without opts when validateWithAuthFilter is only enabled for createOne', async () => {
+      const { resolver, mockService } = await createTestResolver({ one: { validateWithAuthFilter: true } })
       const args: CreateManyInputType<Partial<TestResolverDTO>> = {
         input: [
           {
