@@ -139,6 +139,24 @@ describe('CreateResolver', () => {
       return expect(result).toEqual(output)
     })
 
+    it('should fall back to the top-level flag when the createOne options do not set validateWithAuthFilter', async () => {
+      const { resolver, mockService } = await createTestResolver({ validateWithAuthFilter: true, one: {} })
+      const args: CreateOneInputType<DeepPartial<TestResolverDTO>> = {
+        input: {
+          stringField: 'foo'
+        }
+      }
+      const output: TestResolverDTO = {
+        id: 'id-1',
+        stringField: 'foo'
+      }
+      when(
+        mockService.createOne(objectContaining(args.input), deepEqual({ filter: { stringField: { eq: 'foo' } } }))
+      ).thenResolve(output)
+      const result = await resolver.createOne({ input: args }, { stringField: { eq: 'foo' } })
+      return expect(result).toEqual(output)
+    })
+
     it('should call the service createOne without opts when validateWithAuthFilter is enabled but no auth filter is resolved', async () => {
       const { resolver, mockService } = await createTestResolver({ validateWithAuthFilter: true })
       const args: CreateOneInputType<DeepPartial<TestResolverDTO>> = {
@@ -271,6 +289,26 @@ describe('CreateResolver', () => {
 
     it('should call the service createMany without opts when validateWithAuthFilter is only enabled for createOne', async () => {
       const { resolver, mockService } = await createTestResolver({ one: { validateWithAuthFilter: true } })
+      const args: CreateManyInputType<Partial<TestResolverDTO>> = {
+        input: [
+          {
+            stringField: 'foo'
+          }
+        ]
+      }
+      const output: TestResolverDTO[] = [
+        {
+          id: 'id-1',
+          stringField: 'foo'
+        }
+      ]
+      when(mockService.createMany(objectContaining(args.input), undefined)).thenResolve(output)
+      const result = await resolver.createMany({ input: args })
+      return expect(result).toEqual(output)
+    })
+
+    it('should call the service createMany without opts when validateWithAuthFilter is enabled but no auth filter is resolved', async () => {
+      const { resolver, mockService } = await createTestResolver({ validateWithAuthFilter: true })
       const args: CreateManyInputType<Partial<TestResolverDTO>> = {
         input: [
           {

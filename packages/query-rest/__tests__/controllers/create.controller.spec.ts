@@ -109,6 +109,14 @@ describe('CreateController', () => {
       expect(service.createOne).toHaveBeenCalledWith({ name: 'test' }, { filter: authorizedFilter })
     })
 
+    it('falls back to the top-level flag when the createOne options do not set it', async () => {
+      const service = await setupApp({ validateWithAuthFilter: true, one: {} }, authorizedFilter)
+
+      await postCreateOne()
+
+      expect(service.createOne).toHaveBeenCalledWith({ name: 'test' }, { filter: authorizedFilter })
+    })
+
     it('does not pass opts when the authorizer resolves no filter', async () => {
       const service = await setupApp({ validateWithAuthFilter: true }, undefined)
 

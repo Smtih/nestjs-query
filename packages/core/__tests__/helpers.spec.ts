@@ -275,6 +275,22 @@ describe('applyFilter', () => {
     expect(applyFilter(records, filter)).toEqual([])
   })
 
+  it('should return every record matching an iLike filter when filtering an array', () => {
+    const filter: Filter<TestDTO> = {
+      first: { iLike: 'foo%' }
+    }
+    const records: TestDTO[] = [{ first: 'FOO1' }, { first: 'Foo2' }, { first: 'foo3' }]
+    expect(applyFilter(records, filter)).toEqual(records)
+  })
+
+  it('should exclude every record matching a notILike filter when filtering an array', () => {
+    const filter: Filter<TestDTO> = {
+      first: { notILike: 'foo%' }
+    }
+    const records: TestDTO[] = [{ first: 'FOO1' }, { first: 'Foo2' }, { first: 'foo3' }]
+    expect(applyFilter(records, filter)).toEqual([])
+  })
+
   it('should handle iLike comparisons', () => {
     const filter: Filter<TestDTO> = {
       first: { iLike: '%oo' }
