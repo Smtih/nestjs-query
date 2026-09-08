@@ -15,7 +15,14 @@ import { CreateOneInputType } from '../types'
 import { ParamArgsType } from '../types/param-args.type'
 import { BaseServiceController, ControllerClass, MutationOpts, ServiceController } from './controller.interface'
 
-export interface CreateControllerOpts<DTO, C = DeepPartial<DTO>> extends MutationOpts {
+interface AuthValidationOpts {
+  /**
+   * Determines whether the auth filter should be passed into the query service
+   */
+  validateWithAuthFilter?: boolean
+}
+
+export interface CreateControllerOpts<DTO, C = DeepPartial<DTO>> extends MutationOpts, AuthValidationOpts {
   /**
    * The Input DTO that should be used to create records.
    */
@@ -24,6 +31,8 @@ export interface CreateControllerOpts<DTO, C = DeepPartial<DTO>> extends Mutatio
    * The class to be used for `createOne` input.
    */
   CreateOneInput?: Class<CreateOneInputType<C>>
+
+  one?: MutationOpts['one'] & AuthValidationOpts
 }
 
 export interface CreateController<DTO, C, QS extends QueryService<DTO, C, unknown>> extends ServiceController<DTO, QS> {
@@ -98,15 +107,18 @@ export const Creatable =
         @AuthorizerFilter({
           operationGroup: OperationGroup.CREATE,
           many: false
-        }) // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        })
         authorizeFilter?: Filter<DTO>
       ): Promise<DTO> {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
-        return this.service.createOne({
+        const createOneOpts =
+          opts?.validateWithAuthFilter || opts?.one?.validateWithAuthFilter ? { filter: authorizeFilter ?? {} } : undefined
+        const createOneInput = {
           ...params,
           ...input
-        })
+        }
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        return this.service.createOne(createOneInput, createOneOpts)
       }
     }
 
