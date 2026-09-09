@@ -1,5 +1,5 @@
 import { CommonFieldComparisonBetweenType, FilterComparisonOperators } from '@ptc-org/nestjs-query-core'
-import { ObjectLiteral, Repository } from 'typeorm'
+import { EntityMetadata, ObjectLiteral, Repository } from 'typeorm'
 
 import { randomString } from '../common'
 
@@ -37,6 +37,12 @@ export class SQLComparisonBuilder<Entity> {
     notilike: 'NOT ILIKE'
   }
 
+  /**
+   * @param comparisonMap - the comparison operators this builder understands.
+   * @param repo - repository of the entity this builder was created for. A builder is reused for
+   * every entity reachable from that one, so it never resolves field names against `repo` itself.
+   * `WhereBuilder` reads it to default the metadata it passes to {@link build}.
+   */
   constructor(
     readonly comparisonMap: Record<string, string> = SQLComparisonBuilder.DEFAULT_COMPARISON_MAP,
     readonly repo?: Repository<Entity>
@@ -53,14 +59,18 @@ export class SQLComparisonBuilder<Entity> {
    * @param cmp - the FilterComparisonOperator (eq, neq, gt, etc...)
    * @param val - the value to compare to
    * @param alias - alias for the field.
+   * @param entityMetadata - metadata of the entity `field` belongs to, used to expand virtual
+   * columns. A subclass that overrides `build` without this parameter still builds correct SQL,
+   * but forgoes virtual column expansion for the comparisons it builds.
    */
   public build<F extends keyof Entity>(
     field: F,
     cmp: FilterComparisonOperators<Entity[F]>,
     val: EntityComparisonField<Entity, F>,
-    alias?: string
+    alias?: string,
+    entityMetadata?: EntityMetadata
   ): CmpSQLType {
-    const col = this.getCol(field as string, alias)
+    const col = this.getCol(field as string, alias, entityMetadata)
     const normalizedCmp = (cmp as string).toLowerCase()
     if (this.comparisonMap[normalizedCmp]) {
       // comparison operator (e.b. =, !=, >, <)
@@ -192,13 +202,11 @@ export class SQLComparisonBuilder<Entity> {
     return val !== null && typeof val === 'object' && 'lower' in val && 'upper' in val
   }
 
-  private getCol(field: string, alias?: string): string {
-    if (this.repo) {
-      const column = this.repo.metadata.columns.find(({ databasePath }) => databasePath === field)
+  private getCol(field: string, alias: string | undefined, entityMetadata: EntityMetadata | undefined): string {
+    const column = entityMetadata?.columns.find(({ databasePath }) => databasePath === field)
 
-      if (column && column.isVirtualProperty) {
-        return `(${column.query(alias)})`
-      }
+    if (column && column.isVirtualProperty) {
+      return `(${column.query(alias)})`
     }
 
     return alias ? `${alias}.${field}` : `${field}`

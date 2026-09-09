@@ -1,7 +1,7 @@
-import { Filter } from '@ptc-org/nestjs-query-core'
-import { Op, WhereOptions } from 'sequelize'
+import { Filter, FilterComparisonOperators } from '@ptc-org/nestjs-query-core'
+import { Association, Op, WhereOptions } from 'sequelize'
 
-import { WhereBuilder } from '../../src/query'
+import { EntityComparisonField, SQLComparisonBuilder, WhereBuilder } from '../../src/query'
 import { TestEntity } from '../__fixtures__/test.entity'
 
 describe('WhereBuilder', (): void => {
@@ -173,6 +173,34 @@ describe('WhereBuilder', (): void => {
           ]
         }
       )
+    })
+  })
+
+  describe('custom SQLComparisonBuilder', (): void => {
+    class LowerCasedComparisonBuilder<Entity> extends SQLComparisonBuilder<Entity> {
+      build<F extends keyof Entity>(
+        field: F,
+        cmp: FilterComparisonOperators<Entity[F]>,
+        val: EntityComparisonField<Entity, F>,
+        alias?: string
+      ): WhereOptions {
+        const lowerCasedVal = typeof val === 'string' ? (val.toLowerCase() as EntityComparisonField<Entity, F>) : val
+
+        return super.build(field, cmp, lowerCasedVal, alias)
+      }
+    }
+
+    it('should apply the custom comparison builder to association comparisons', (): void => {
+      const associations = new Map<string, Association>([
+        ['testRelations', { target: { rawAttributes: {} } } as unknown as Association]
+      ])
+      const whereBuilder = new WhereBuilder<TestEntity>(new LowerCasedComparisonBuilder<TestEntity>())
+
+      const actual = whereBuilder.build({ testRelations: { relationName: { eq: 'FOO' } } } as Filter<TestEntity>, associations)
+
+      expect(actual).toEqual({
+        [Op.and]: [{ [Op.and]: [{ '$testRelations.relationName$': { [Op.eq]: 'foo' } }] }]
+      })
     })
   })
 })

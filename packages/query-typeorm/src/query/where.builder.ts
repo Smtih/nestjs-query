@@ -1,7 +1,7 @@
 import { Filter, FilterComparisons, FilterFieldComparison } from '@ptc-org/nestjs-query-core'
 import { Brackets } from 'typeorm'
 
-import type { WhereExpressionBuilder } from 'typeorm'
+import type { EntityMetadata, WhereExpressionBuilder } from 'typeorm'
 
 import { NestedRelationsAliased } from './filter-query.builder'
 import { EntityComparisonField, SQLComparisonBuilder } from './sql-comparison.builder'
@@ -11,7 +11,17 @@ import { EntityComparisonField, SQLComparisonBuilder } from './sql-comparison.bu
  * Builds a WHERE clause from a Filter.
  */
 export class WhereBuilder<Entity> {
-  constructor(private readonly sqlComparisonBuilder: SQLComparisonBuilder<Entity> = new SQLComparisonBuilder<Entity>()) {}
+  /**
+   * @param sqlComparisonBuilder - builds the SQL for a single field comparison. The same instance
+   * is reused for every relation reached from `Entity`, so any customisation of it applies to
+   * relation fields too.
+   * @param entityMetadata - metadata of `Entity`, which scopes the fields comparisons resolve
+   * against. Defaults to the metadata of the repository the comparison builder was created for.
+   */
+  constructor(
+    private readonly sqlComparisonBuilder: SQLComparisonBuilder<Entity> = new SQLComparisonBuilder<Entity>(),
+    private readonly entityMetadata: EntityMetadata | undefined = sqlComparisonBuilder.repo?.metadata
+  ) {}
 
   /**
    * Builds a WHERE clause from a Filter.
@@ -140,7 +150,13 @@ export class WhereBuilder<Entity> {
       new Brackets((qb) => {
         const opts = Object.keys(cmp) as (keyof FilterFieldComparison<Entity[T]>)[]
         const sqlComparisons = opts.map((cmpType) =>
-          this.sqlComparisonBuilder.build(field, cmpType, cmp[cmpType] as EntityComparisonField<Entity, T>, alias)
+          this.sqlComparisonBuilder.build(
+            field,
+            cmpType,
+            cmp[cmpType] as EntityComparisonField<Entity, T>,
+            alias,
+            this.entityMetadata
+          )
         )
 
         sqlComparisons.map(({ sql, params }) => qb.orWhere(sql, params))
@@ -156,8 +172,11 @@ export class WhereBuilder<Entity> {
   ): Where {
     return where.andWhere(
       new Brackets((qb) => {
-        const relationWhere = new WhereBuilder<Entity[T]>()
         const nestedRelationAliased = relationNames[field as string]
+        const relationWhere = new WhereBuilder<Entity[T]>(
+          this.sqlComparisonBuilder as unknown as SQLComparisonBuilder<Entity[T]>,
+          nestedRelationAliased.metadata
+        )
         const nestedRelationAliasedAlias = nestedRelationAliased.alias
         const nestedRelationAliasedRelationNames = nestedRelationAliased.relations
 

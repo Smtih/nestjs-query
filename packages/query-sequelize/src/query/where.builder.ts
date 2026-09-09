@@ -72,8 +72,10 @@ export class WhereBuilder<Entity> {
     alias?: string
   ): WhereOptions {
     if (associations.has(field as string)) {
-      const wb = new WhereBuilder<Entity[T]>()
-      return wb.build(cmp as unknown as Filter<Entity[T]>, associations, field as string)
+      const associationWhereBuilder = new WhereBuilder<Entity[T]>(
+        this.sqlComparisonBuilder as unknown as SQLComparisonBuilder<Entity[T]>
+      )
+      return associationWhereBuilder.build(cmp as unknown as Filter<Entity[T]>, associations, field as string)
     }
     let colName = field
     if (alias && associations.has(alias)) {
