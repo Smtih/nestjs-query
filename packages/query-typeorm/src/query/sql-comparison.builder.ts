@@ -93,6 +93,25 @@ export class SQLComparisonBuilder<Entity> {
     throw new Error(`unknown operator ${JSON.stringify(cmp)}`)
   }
 
+  /**
+   * Derives the builder used for comparisons on a relation of `Entity`.
+   *
+   * The derived builder is of the same class and carries the same comparison map, so custom
+   * operators and SQL transforms apply to relation fields as well as root entity fields.
+   *
+   * It deliberately carries no repository: `repo` describes the root entity, and resolving a
+   * relation's field names against root entity metadata would expand the wrong virtual columns.
+   *
+   * Subclasses that declare a constructor signature other than `SQLComparisonBuilder`'s must
+   * override this method, since the default implementation constructs the subclass with a
+   * comparison map as its only argument.
+   */
+  public forRelation<Relation>(): SQLComparisonBuilder<Relation> {
+    const BuilderClass = this.constructor as new (comparisonMap: Record<string, string>) => SQLComparisonBuilder<Relation>
+
+    return new BuilderClass(this.comparisonMap)
+  }
+
   private createComparisonSQL<F extends keyof Entity>(
     cmp: string,
     col: string,

@@ -156,7 +156,7 @@ export class WhereBuilder<Entity> {
   ): Where {
     return where.andWhere(
       new Brackets((qb) => {
-        const relationWhere = new WhereBuilder<Entity[T]>()
+        const relationWhere = new WhereBuilder<Entity[T]>(this.sqlComparisonBuilder.forRelation<Entity[T]>())
         const nestedRelationAliased = relationNames[field as string]
         const nestedRelationAliasedAlias = nestedRelationAliased.alias
         const nestedRelationAliasedRelationNames = nestedRelationAliased.relations
