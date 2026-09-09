@@ -1,11 +1,12 @@
 import { Filter, FilterComparisonOperators } from '@ptc-org/nestjs-query-core'
 import { format as formatSql } from 'sql-formatter'
-import { DataSource, Repository } from 'typeorm'
+import { DataSource, EntityMetadata, Repository } from 'typeorm'
 
-import { EntityComparisonField, SQLComparisonBuilder, WhereBuilder } from '../../src/query'
+import { EntityComparisonField, FilterQueryBuilder, SQLComparisonBuilder, WhereBuilder } from '../../src/query'
 import { createTestConnection } from '../__fixtures__/connection.fixture'
 import { TestEntity } from '../__fixtures__/test.entity'
 import { TestRelation } from '../__fixtures__/test-relation.entity'
+import { TestVirtualColumnEntity } from '../__fixtures__/test-virtual-column.entity'
 
 describe('WhereBuilder', (): void => {
   let dataSource: DataSource
@@ -116,8 +117,8 @@ describe('WhereBuilder', (): void => {
         super()
       }
 
-      public forRelation<Relation>(): SQLComparisonBuilder<Relation> {
-        return new CollatedComparisonBuilder<Relation>(this.collation)
+      public forRelation<Relation>(relationMetadata?: EntityMetadata): SQLComparisonBuilder<Relation> {
+        return new CollatedComparisonBuilder<Relation>(this.collation).withEntityMetadata(relationMetadata)
       }
 
       public build<F extends keyof Entity>(
@@ -132,12 +133,15 @@ describe('WhereBuilder', (): void => {
       }
     }
 
-    const relationNames = { testRelations: { alias: 'TestRelation', relations: {} } }
     const relationFilter = { testRelations: { relationName: { eq: 'foo' } } } as Filter<TestEntity>
+
+    const getRelationNames = () => ({
+      testRelations: { alias: 'TestRelation', metadata: dataSource.getMetadata(TestRelation), relations: {} }
+    })
 
     const buildRelationFilterSql = (sqlComparisonBuilder: SQLComparisonBuilder<TestEntity>): string => {
       const [sql] = new WhereBuilder<TestEntity>(sqlComparisonBuilder)
-        .build(getQueryBuilder(), relationFilter, relationNames, 'TestEntity')
+        .build(getQueryBuilder(), relationFilter, getRelationNames(), 'TestEntity')
         .getQueryAndParameters()
 
       return sql
@@ -168,6 +172,35 @@ describe('WhereBuilder', (): void => {
 
       expect(sql).toContain('TestRelation.relationName')
       expect(sql).not.toContain('SELECT 1 FROM')
+    })
+  })
+
+  describe('virtual columns', (): void => {
+    const buildVirtualColumnFilterSql = (filter: Filter<TestVirtualColumnEntity>): string => {
+      const repo = dataSource.getRepository(TestVirtualColumnEntity)
+      const [sql] = new FilterQueryBuilder<TestVirtualColumnEntity>(repo)
+        .applyFilter(repo.createQueryBuilder('TestVirtualColumnEntity'), filter, 'TestVirtualColumnEntity')
+        .getQueryAndParameters()
+
+      return sql.replace(/"/g, '')
+    }
+
+    it('should compare a root virtual column with its query', (): void => {
+      const sql = buildVirtualColumnFilterSql({ relationCount: { gt: 1 } })
+
+      expect(sql).toContain(
+        '((SELECT COUNT(*) FROM test_virtual_column_relation WHERE test_virtual_column_entity_id = TestVirtualColumnEntity.test_virtual_column_pk) > 1)'
+      )
+      expect(sql).not.toContain('TestVirtualColumnEntity.relationCount')
+    })
+
+    it('should compare a relation virtual column with its query aliased to the relation', (): void => {
+      const sql = buildVirtualColumnFilterSql({ virtualColumnRelations: { siblingCount: { gt: 1 } } })
+
+      expect(sql).toContain(
+        '((SELECT COUNT(*) FROM test_virtual_column_relation WHERE test_virtual_column_entity_id = virtualColumnRelations.test_virtual_column_entity_id) > 1)'
+      )
+      expect(sql).not.toContain('virtualColumnRelations.siblingCount')
     })
   })
 })

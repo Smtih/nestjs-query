@@ -1,5 +1,5 @@
 import { CommonFieldComparisonBetweenType, FilterComparisonOperators } from '@ptc-org/nestjs-query-core'
-import { ObjectLiteral, Repository } from 'typeorm'
+import { EntityMetadata, ObjectLiteral, Repository } from 'typeorm'
 
 import { randomString } from '../common'
 
@@ -37,10 +37,14 @@ export class SQLComparisonBuilder<Entity> {
     notilike: 'NOT ILIKE'
   }
 
+  private entityMetadata?: EntityMetadata
+
   constructor(
     readonly comparisonMap: Record<string, string> = SQLComparisonBuilder.DEFAULT_COMPARISON_MAP,
     readonly repo?: Repository<Entity>
-  ) {}
+  ) {
+    this.entityMetadata = repo?.metadata
+  }
 
   private get paramName(): string {
     return `param${randomString()}`
@@ -101,15 +105,32 @@ export class SQLComparisonBuilder<Entity> {
    *
    * It deliberately carries no repository: `repo` describes the root entity, and resolving a
    * relation's field names against root entity metadata would expand the wrong virtual columns.
+   * The relation's own metadata is carried instead, so that a relation's virtual columns expand
+   * into their queries while the root entity's do not leak into relation comparisons.
    *
    * Subclasses that declare a constructor signature other than `SQLComparisonBuilder`'s must
    * override this method, since the default implementation constructs the subclass with a
-   * comparison map as its only argument.
+   * comparison map as its only argument. Such an override should pass `relationMetadata` on with
+   * {@link withEntityMetadata} to keep virtual column support for the relation's fields.
+   *
+   * @param relationMetadata - metadata of the relation the derived builder compares fields of.
    */
-  public forRelation<Relation>(): SQLComparisonBuilder<Relation> {
+  public forRelation<Relation>(relationMetadata?: EntityMetadata): SQLComparisonBuilder<Relation> {
     const BuilderClass = this.constructor as new (comparisonMap: Record<string, string>) => SQLComparisonBuilder<Relation>
 
-    return new BuilderClass(this.comparisonMap)
+    return new BuilderClass(this.comparisonMap).withEntityMetadata(relationMetadata)
+  }
+
+  /**
+   * Sets the metadata that field names are resolved against when building comparisons, and returns
+   * the builder for chaining.
+   *
+   * @param entityMetadata - metadata of the entity whose fields this builder compares.
+   */
+  protected withEntityMetadata(entityMetadata?: EntityMetadata): this {
+    this.entityMetadata = entityMetadata
+
+    return this
   }
 
   private createComparisonSQL<F extends keyof Entity>(
@@ -212,12 +233,10 @@ export class SQLComparisonBuilder<Entity> {
   }
 
   private getCol(field: string, alias?: string): string {
-    if (this.repo) {
-      const column = this.repo.metadata.columns.find(({ databasePath }) => databasePath === field)
+    const column = this.entityMetadata?.columns.find(({ databasePath }) => databasePath === field)
 
-      if (column && column.isVirtualProperty) {
-        return `(${column.query(alias)})`
-      }
+    if (column && column.isVirtualProperty) {
+      return `(${column.query(alias)})`
     }
 
     return alias ? `${alias}.${field}` : `${field}`
