@@ -4,10 +4,12 @@ import { DataSource } from 'typeorm'
 
 import { WhereBuilder } from '../../src/query'
 import { createTestConnection } from '../__fixtures__/connection.fixture'
+import { enableRelationJoinConditions } from '../__fixtures__/relation-join-conditions.fixture'
 import { TestEntity } from '../__fixtures__/test.entity'
 
 describe('WhereBuilder', (): void => {
   let dataSource: DataSource
+  beforeAll(enableRelationJoinConditions)
   beforeEach(async () => {
     dataSource = await createTestConnection()
   })

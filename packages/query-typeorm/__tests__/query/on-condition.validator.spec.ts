@@ -1,9 +1,12 @@
 import { Filter } from '@ptc-org/nestjs-query-core'
 
 import { assertValidOnConditionPlacement, InvalidOnConditionPlacementError } from '../../src/query'
+import { enableRelationJoinConditions } from '../__fixtures__/relation-join-conditions.fixture'
 import { TestEntity } from '../__fixtures__/test.entity'
 
 describe('assertValidOnConditionPlacement', (): void => {
+  beforeAll(enableRelationJoinConditions)
+
   const assertPlacement = (filter: Filter<TestEntity>) => () => assertValidOnConditionPlacement(filter)
 
   it('should accept a filter without join conditions', (): void => {
@@ -44,19 +47,19 @@ describe('assertValidOnConditionPlacement', (): void => {
 
   it('should reject join conditions at the root filter level', (): void => {
     expect(assertPlacement({ on: { stringType: { eq: 'foo' } } })).toThrow(
-      '`on` conditions are only supported at the top level of a relation filter, not at the root filter level.'
+      'Join conditions are only supported at the top level of a relation filter, not at the root filter level.'
     )
   })
 
   it('should reject join conditions inside an and', (): void => {
     expect(assertPlacement({ testRelations: { and: [{ on: { relationName: { eq: 'foo' } } }] } })).toThrow(
-      '`on` conditions are only supported at the top level of a relation filter, not inside an `and`/`or` expression.'
+      'Join conditions are only supported at the top level of a relation filter, not inside an `and`/`or` expression.'
     )
   })
 
   it('should reject join conditions inside an or', (): void => {
     expect(assertPlacement({ testRelations: { or: [{ on: { relationName: { eq: 'foo' } } }] } })).toThrow(
-      '`on` conditions are only supported at the top level of a relation filter, not inside an `and`/`or` expression.'
+      'Join conditions are only supported at the top level of a relation filter, not inside an `and`/`or` expression.'
     )
   })
 

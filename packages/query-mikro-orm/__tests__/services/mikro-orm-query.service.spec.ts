@@ -1,6 +1,13 @@
 import { BetterSqliteDriver } from '@mikro-orm/better-sqlite'
 import { EntityRepository, MikroORM } from '@mikro-orm/core'
-import { SortDirection, SortNulls } from '@ptc-org/nestjs-query-core'
+import {
+  clearReservedRelationJoinConditionKeys,
+  DEFAULT_RELATION_JOIN_CONDITION_KEY,
+  Filter,
+  reserveRelationJoinConditionKey,
+  SortDirection,
+  SortNulls
+} from '@ptc-org/nestjs-query-core'
 
 import { MikroOrmQueryService } from '../../src'
 import { createTestConnection, refresh, TEST_ENTITIES, TestEntity, TestRelation } from '../__fixtures__'
@@ -29,6 +36,19 @@ describe('MikroOrmQueryService', () => {
     it('should return all entities when no filter is provided', async () => {
       const result = await queryService.query({})
       expect(result).toHaveLength(TEST_ENTITIES.length)
+    })
+
+    it('should ignore a reserved join condition key', async () => {
+      reserveRelationJoinConditionKey(TestEntity, DEFAULT_RELATION_JOIN_CONDITION_KEY)
+
+      const result = await queryService.query({
+        filter: { on: { stringType: { eq: 'never-matches' } }, stringType: { eq: 'foo1' } } as Filter<TestEntity>
+      })
+
+      expect(result).toHaveLength(1)
+      expect(result[0].stringType).toBe('foo1')
+
+      clearReservedRelationJoinConditionKeys()
     })
 
     it('should filter by eq operator', async () => {

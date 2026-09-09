@@ -1,6 +1,11 @@
 import { ObjectType } from '@nestjs/graphql'
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose'
-import { Filter } from '@ptc-org/nestjs-query-core'
+import {
+  clearReservedRelationJoinConditionKeys,
+  DEFAULT_RELATION_JOIN_CONDITION_KEY,
+  Filter,
+  reserveRelationJoinConditionKey
+} from '@ptc-org/nestjs-query-core'
 import { FilterableField, FilterType } from '@ptc-org/nestjs-query-graphql'
 import { plainToClass } from 'class-transformer'
 import { Document, model, QueryFilter } from 'mongoose'
@@ -21,8 +26,21 @@ describe('WhereBuilder', (): void => {
     expect(actual).toEqual(expectedFilterQuery)
   }
 
+  afterEach(clearReservedRelationJoinConditionKeys)
+
   it('should accept a empty filter', (): void => {
     expectFilter({}, {})
+  })
+
+  it('should ignore a reserved join condition key', (): void => {
+    reserveRelationJoinConditionKey(TestEntity, DEFAULT_RELATION_JOIN_CONDITION_KEY)
+
+    const withJoinConditions = createWhereBuilder().build({
+      on: { numberType: { gt: 1 } },
+      stringType: { like: 'foo%' }
+    } as Filter<TestEntity>)
+
+    expect(withJoinConditions).toEqual(createWhereBuilder().build({ stringType: { like: 'foo%' } }))
   })
 
   it('or multiple operators for a single field together', (): void => {

@@ -1,6 +1,8 @@
 import {
   AggregateResponse,
   applyFilter,
+  clearReservedRelationJoinConditionKeys,
+  DEFAULT_RELATION_JOIN_CONDITION_KEY,
   applyPaging,
   applyQuery,
   applySort,
@@ -13,6 +15,7 @@ import {
   Paging,
   Query,
   QueryFieldMap,
+  reserveRelationJoinConditionKey,
   SortDirection,
   SortField,
   SortNulls,
@@ -45,6 +48,8 @@ class TestEntity {
 
   ageInYears?: number
 }
+
+afterEach(clearReservedRelationJoinConditionKeys)
 
 const fieldMap: QueryFieldMap<TestDTO, TestEntity> = {
   first: 'firstName',
@@ -193,6 +198,8 @@ describe('applyFilter', () => {
   })
 
   it('should ignore join conditions, which have no in memory equivalent', () => {
+    reserveRelationJoinConditionKey(TestDTO, DEFAULT_RELATION_JOIN_CONDITION_KEY)
+
     const filter: Filter<TestDTO> = {
       on: { first: { eq: 'never-matches' } },
       last: { eq: 'bar' }
@@ -684,6 +691,8 @@ describe('getFilterFields', () => {
   })
 
   it('should not treat join conditions as a field', () => {
+    reserveRelationJoinConditionKey(TestDTO, DEFAULT_RELATION_JOIN_CONDITION_KEY)
+
     const filter: Filter<Test> = {
       strField: { eq: '' },
       testRelation: {

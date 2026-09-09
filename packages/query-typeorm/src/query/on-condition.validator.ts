@@ -1,4 +1,4 @@
-import { Filter, ON_CONDITION_KEY } from '@ptc-org/nestjs-query-core'
+import { findRelationJoinConditionKey, Filter } from '@ptc-org/nestjs-query-core'
 
 /**
  * Thrown when a filter carries an `on` key in a position that cannot be attached to a
@@ -6,7 +6,7 @@ import { Filter, ON_CONDITION_KEY } from '@ptc-org/nestjs-query-core'
  */
 export class InvalidOnConditionPlacementError extends Error {
   constructor(detail: string) {
-    super(`\`on\` conditions are only supported at the top level of a relation filter, ${detail}.`)
+    super(`Join conditions are only supported at the top level of a relation filter, ${detail}.`)
 
     this.name = 'InvalidOnConditionPlacementError'
   }
@@ -17,7 +17,7 @@ function isFilterLike(filter: unknown): filter is Record<string, unknown> {
 }
 
 function hasOnCondition(filter: unknown): boolean {
-  return isFilterLike(filter) && ON_CONDITION_KEY in filter
+  return findRelationJoinConditionKey(filter) !== undefined
 }
 
 function assertNoRootOnCondition(filter: Filter<unknown>): void {

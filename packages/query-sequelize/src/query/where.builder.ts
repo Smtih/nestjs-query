@@ -1,4 +1,4 @@
-import { Filter, FilterComparisons, FilterFieldComparison } from '@ptc-org/nestjs-query-core'
+import { Filter, FilterComparisons, FilterFieldComparison, isReservedRelationJoinConditionKey } from '@ptc-org/nestjs-query-core'
 import { Association, Op, WhereOptions } from 'sequelize'
 
 import { EntityComparisonField, SQLComparisonBuilder } from './sql-comparison.builder'
@@ -45,7 +45,7 @@ export class WhereBuilder<Entity> {
    */
   private filterFields(filter: Filter<Entity>, associations: Map<string, Association>, alias?: string): WhereOptions | undefined {
     const ands = Object.keys(filter)
-      .filter((f) => f !== 'and' && f !== 'or')
+      .filter((f) => f !== 'and' && f !== 'or' && !isReservedRelationJoinConditionKey(f))
       .map((field) =>
         this.withFilterComparison(field as keyof Entity, this.getField(filter, field as keyof Entity), associations, alias)
       )

@@ -1,4 +1,4 @@
-import { Filter, FilterComparisons, FilterFieldComparison, ON_CONDITION_KEY } from '@ptc-org/nestjs-query-core'
+import { Filter, FilterComparisons, FilterFieldComparison, isReservedRelationJoinConditionKey } from '@ptc-org/nestjs-query-core'
 import { Brackets } from 'typeorm'
 
 import type { WhereExpressionBuilder } from 'typeorm'
@@ -105,7 +105,7 @@ export class WhereBuilder<Entity> {
     alias: string | undefined
   ): Where {
     return Object.keys(filter).reduce((w, field) => {
-      if (field !== 'and' && field !== 'or' && field !== ON_CONDITION_KEY) {
+      if (field !== 'and' && field !== 'or' && !isReservedRelationJoinConditionKey(field)) {
         return this.withFilterComparison(
           where,
           field as keyof Entity,

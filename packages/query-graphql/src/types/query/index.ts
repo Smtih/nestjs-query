@@ -1,4 +1,12 @@
-export { AggregateFilterType, DeleteFilterType, FilterType, SubscriptionFilterType, UpdateFilterType } from './filter.type'
+export {
+  AggregateFilterType,
+  DeleteFilterType,
+  FilterType,
+  FilterTypeOptions,
+  ReservedRelationJoinConditionKeyError,
+  SubscriptionFilterType,
+  UpdateFilterType
+} from './filter.type'
 export { CursorPagingType, NonePagingType, OffsetPagingType, PagingStrategies, PagingTypes } from './paging'
 export {
   CursorQueryArgsType,
@@ -12,3 +20,8 @@ export {
   StaticQueryType
 } from './query-args'
 export { QueryArgsType } from './query-args.type'
+export {
+  RelationJoinConditionsOption,
+  RelationJoinConditionsOptions,
+  resolveRelationJoinConditionKey
+} from './relation-join-conditions'
