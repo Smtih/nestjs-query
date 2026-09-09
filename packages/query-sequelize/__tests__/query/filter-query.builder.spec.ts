@@ -1,5 +1,5 @@
 import { Query, SortDirection, SortNulls } from '@ptc-org/nestjs-query-core'
-import { DestroyOptions, Dialect, FindOptions, literal, Op, UpdateOptions } from 'sequelize'
+import { col, DestroyOptions, Dialect, FindOptions, fn, Op, UpdateOptions } from 'sequelize'
 import { Sequelize } from 'sequelize-typescript'
 import { anything, deepEqual, instance, mock, verify, when } from 'ts-mockito'
 
@@ -8,10 +8,23 @@ import { CONNECTION_OPTIONS } from '../__fixtures__/sequelize.fixture'
 import { TestEntity } from '../__fixtures__/test.entity'
 
 describe('FilterQueryBuilder', (): void => {
-  const connectModelsToDialect = (dialect: Dialect): Sequelize =>
-    new Sequelize({ ...CONNECTION_OPTIONS, dialect, username: 'test' })
+  let connectedSequelize: Sequelize | undefined
+
+  const closeConnectedSequelize = async (): Promise<void> => {
+    await connectedSequelize?.close()
+    connectedSequelize = undefined
+  }
+
+  const connectModelsToDialect = async (dialect: Dialect): Promise<void> => {
+    await closeConnectedSequelize()
+    connectedSequelize = new Sequelize({ ...CONNECTION_OPTIONS, dialect, username: 'test' })
+  }
+
+  const isNullOrderingKey = (columnName: string) => fn('ISNULL', col(`TestEntity.${columnName}`))
 
   beforeEach(() => connectModelsToDialect('sqlite'))
+
+  afterEach(() => closeConnectedSequelize())
 
   const getEntityQueryBuilder = (whereBuilder: WhereBuilder<TestEntity>): FilterQueryBuilder<TestEntity> =>
     new FilterQueryBuilder(TestEntity, whereBuilder)
@@ -219,7 +232,7 @@ describe('FilterQueryBuilder', (): void => {
             instance(mockWhereBuilder),
             {
               order: [
-                [literal('`number_type` IS NULL'), 'DESC'],
+                [isNullOrderingKey('number_type'), 'DESC'],
                 ['numberType', 'ASC']
               ]
             }
@@ -233,7 +246,7 @@ describe('FilterQueryBuilder', (): void => {
             instance(mockWhereBuilder),
             {
               order: [
-                [literal('`number_type` IS NULL'), 'ASC'],
+                [isNullOrderingKey('number_type'), 'ASC'],
                 ['numberType', 'DESC']
               ]
             }
@@ -261,13 +274,27 @@ describe('FilterQueryBuilder', (): void => {
             {
               order: [
                 ['numberType', 'ASC'],
-                [literal('`string_type` IS NULL'), 'DESC'],
+                [isNullOrderingKey('string_type'), 'DESC'],
                 ['stringType', 'ASC'],
-                [literal('`date_type` IS NULL'), 'ASC'],
+                [isNullOrderingKey('date_type'), 'ASC'],
                 ['dateType', 'DESC']
               ]
             }
           )
+        })
+
+        it('should qualify the IS NULL key when the filter joins a relation', () => {
+          const mockWhereBuilder = mock<WhereBuilder<TestEntity>>(WhereBuilder)
+          const findOptions = getEntityQueryBuilder(instance(mockWhereBuilder)).findOptions({
+            filter: { testRelations: { relationName: { eq: 'foo' } } },
+            sorting: [{ field: 'numberType', direction: SortDirection.ASC, nulls: SortNulls.NULLS_FIRST }]
+          })
+
+          expect(findOptions.include).toHaveLength(1)
+          expect(findOptions.order).toEqual([
+            [isNullOrderingKey('number_type'), 'DESC'],
+            ['numberType', 'ASC']
+          ])
         })
       })
 

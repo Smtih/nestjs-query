@@ -486,7 +486,7 @@ describe('FilterQueryBuilder', (): void => {
         verify(mockWhereBuilder.build(anything(), anything(), {}, 'TestEntity')).never()
       })
 
-      describe('on a driver without NULLS FIRST/LAST support', () => {
+      describe('on a driver without NULLS FIRST/LAST support (snapshots keep SQLite quoting)', () => {
         beforeEach(() => connection.setOptions({ type: 'mysql' } as Partial<DataSourceOptions>))
 
         it('should order by an IS NULL key before the column for NULLS_FIRST', () => {
@@ -668,7 +668,7 @@ describe('FilterQueryBuilder', (): void => {
         verify(mockWhereBuilder.build(anything(), anything(), anything())).never()
       })
 
-      describe('on a driver without NULLS FIRST/LAST support', () => {
+      describe('on a driver without NULLS FIRST/LAST support (snapshots keep SQLite quoting)', () => {
         beforeEach(() => connection.setOptions({ type: 'mysql' } as Partial<DataSourceOptions>))
 
         it('should order by an IS NULL key before the unaliased column', () => {

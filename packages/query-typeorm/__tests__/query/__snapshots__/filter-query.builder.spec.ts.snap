@@ -346,7 +346,7 @@ ORDER BY
   "TestEntity"."number_type" DESC NULLS LAST"
 `;
 
-exports[`FilterQueryBuilder #select with sorting on a driver without NULLS FIRST/LAST support should keep each IS NULL key next to its own field in a multiple sort 1`] = `
+exports[`FilterQueryBuilder #select with sorting on a driver without NULLS FIRST/LAST support (snapshots keep SQLite quoting) should keep each IS NULL key next to its own field in a multiple sort 1`] = `
 "SELECT
   "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
   "TestEntity"."string_type" AS "TestEntity_string_type",
@@ -366,7 +366,7 @@ ORDER BY
   "TestEntity"."date_type" DESC"
 `;
 
-exports[`FilterQueryBuilder #select with sorting on a driver without NULLS FIRST/LAST support should not add an IS NULL key when nulls is not specified 1`] = `
+exports[`FilterQueryBuilder #select with sorting on a driver without NULLS FIRST/LAST support (snapshots keep SQLite quoting) should not add an IS NULL key when nulls is not specified 1`] = `
 "SELECT
   "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
   "TestEntity"."string_type" AS "TestEntity_string_type",
@@ -382,7 +382,7 @@ ORDER BY
   "TestEntity"."number_type" ASC"
 `;
 
-exports[`FilterQueryBuilder #select with sorting on a driver without NULLS FIRST/LAST support should order by an IS NULL key before the column for NULLS_FIRST 1`] = `
+exports[`FilterQueryBuilder #select with sorting on a driver without NULLS FIRST/LAST support (snapshots keep SQLite quoting) should order by an IS NULL key before the column for NULLS_FIRST 1`] = `
 "SELECT
   "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
   "TestEntity"."string_type" AS "TestEntity_string_type",
@@ -399,7 +399,7 @@ ORDER BY
   "TestEntity"."number_type" ASC"
 `;
 
-exports[`FilterQueryBuilder #select with sorting on a driver without NULLS FIRST/LAST support should order by an IS NULL key before the column for NULLS_LAST 1`] = `
+exports[`FilterQueryBuilder #select with sorting on a driver without NULLS FIRST/LAST support (snapshots keep SQLite quoting) should order by an IS NULL key before the column for NULLS_LAST 1`] = `
 "SELECT
   "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
   "TestEntity"."string_type" AS "TestEntity_string_type",
@@ -570,7 +570,7 @@ SET
   "string_type" = baz"
 `;
 
-exports[`FilterQueryBuilder #update with sorting on a driver without NULLS FIRST/LAST support should order by an IS NULL key before the unaliased column 1`] = `
+exports[`FilterQueryBuilder #update with sorting on a driver without NULLS FIRST/LAST support (snapshots keep SQLite quoting) should order by an IS NULL key before the unaliased column 1`] = `
 "UPDATE "test_entity"
 SET
   "string_type" = baz
