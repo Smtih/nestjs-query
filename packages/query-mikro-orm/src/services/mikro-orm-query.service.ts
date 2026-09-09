@@ -10,6 +10,7 @@ import {
   FindByIdOptions,
   FindRelationOptions,
   GetByIdOptions,
+  isReservedRelationJoinConditionKey,
   NoOpQueryService,
   Query,
   QueryRelationsOptions,
@@ -113,9 +114,11 @@ export class MikroOrmQueryService<DTO extends object, Entity extends object = DT
   }
 
   protected expandFilter(comparisons: FilterComparisons<unknown>): FilterQuery<Entity> {
-    const filters = Object.entries(comparisons).map(([k, v]) => {
-      return this.expandFilterComparison(k, v)
-    })
+    const filters = Object.entries(comparisons)
+      .filter(([k]) => !isReservedRelationJoinConditionKey(k))
+      .map(([k, v]) => {
+        return this.expandFilterComparison(k, v)
+      })
 
     return Object.fromEntries(filters) as FilterQuery<Entity>
   }

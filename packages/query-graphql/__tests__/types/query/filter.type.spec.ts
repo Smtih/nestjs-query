@@ -29,8 +29,18 @@ import {
   UpdateFilterType
 } from '@ptc-org/nestjs-query-graphql'
 import { plainToClass } from 'class-transformer'
+import { buildSchema, getNamedType, GraphQLInputObjectType } from 'graphql'
 
 import { generateSchema } from '../../__fixtures__'
+
+const getQueryFilterInputType = (schema: string, queryName: string): GraphQLInputObjectType => {
+  const [filterArg] = buildSchema(schema).getQueryType().getFields()[queryName].args
+
+  return getNamedType(filterArg.type) as GraphQLInputObjectType
+}
+
+const getQueryFilterFieldNames = (schema: string, queryName: string): string[] =>
+  Object.keys(getQueryFilterInputType(schema, queryName).getFields())
 
 describe('filter types', (): void => {
   enum NumberEnum {
@@ -62,6 +72,7 @@ describe('filter types', (): void => {
   }
 
   @ObjectType('TestRelationDto')
+  @QueryOptions({ enableRelationJoinConditions: true })
   class TestRelation extends BaseType {
     @FilterableField()
     relationName!: string
@@ -754,6 +765,281 @@ describe('filter types', (): void => {
 
         const schema = await generateSchema([FilterTypeSpec])
         expect(schema).toMatchSnapshot()
+      })
+    })
+
+    describe('enableRelationJoinConditions option', () => {
+      it('should not expose join conditions by default', async () => {
+        @ObjectType('TestJoinConditionsDisabled_RelationA')
+        class TestJoinConditionsDisabledRelationADto extends BaseType {
+          @FilterableField()
+          relationName!: string
+        }
+
+        @ObjectType('TestJoinConditionsDisabled')
+        @FilterableRelation('filterableRelation', () => TestJoinConditionsDisabledRelationADto)
+        class TestJoinConditionsDisabledDto extends BaseType {
+          @FilterableField()
+          numberField!: number
+        }
+
+        const TestJoinConditionsFilter = FilterType(TestJoinConditionsDisabledDto)
+
+        @Resolver()
+        class FilterTypeSpec {
+          @Query(() => Int)
+          test(
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            @Args('input', { type: () => TestJoinConditionsFilter }) input: unknown
+          ): number {
+            return 1
+          }
+        }
+
+        const schema = await generateSchema([FilterTypeSpec])
+        const relationFilter = getNamedType(
+          getQueryFilterInputType(schema, 'test').getFields().filterableRelation.type
+        ) as GraphQLInputObjectType
+
+        expect(Object.keys(relationFilter.getFields())).not.toContain('on')
+        expect(schema).not.toContain('TestJoinConditionsDisabled_RelationAOnConditionFilter')
+        expect(schema).toMatchSnapshot()
+      })
+
+      it('should expose join conditions when the relation dto opts in', async () => {
+        @ObjectType('TestJoinConditionsEnabled_RelationA')
+        @QueryOptions({ enableRelationJoinConditions: true })
+        class TestJoinConditionsEnabledRelationADto extends BaseType {
+          @FilterableField()
+          relationName!: string
+        }
+
+        @ObjectType('TestJoinConditionsEnabled')
+        @FilterableRelation('filterableRelation', () => TestJoinConditionsEnabledRelationADto)
+        class TestJoinConditionsEnabledDto extends BaseType {
+          @FilterableField()
+          numberField!: number
+        }
+
+        const TestJoinConditionsFilter = FilterType(TestJoinConditionsEnabledDto)
+
+        @Resolver()
+        class FilterTypeSpec {
+          @Query(() => Int)
+          test(
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            @Args('input', { type: () => TestJoinConditionsFilter }) input: unknown
+          ): number {
+            return 1
+          }
+        }
+
+        const schema = await generateSchema([FilterTypeSpec])
+        const relationFilter = getNamedType(
+          getQueryFilterInputType(schema, 'test').getFields().filterableRelation.type
+        ) as GraphQLInputObjectType
+
+        expect(Object.keys(relationFilter.getFields())).toContain('on')
+        expect(schema).toContain('input TestJoinConditionsEnabled_RelationAOnConditionFilter')
+        expect(schema).toMatchSnapshot()
+      })
+
+      it('should keep join conditions off a root filter that is also a relation at infinite depth', async () => {
+        @ObjectType('TestJoinConditionsInfinite_RelationA')
+        @QueryOptions({ filterDepth: Number.POSITIVE_INFINITY, enableRelationJoinConditions: true })
+        class TestJoinConditionsInfiniteRelationADto extends BaseType {
+          @FilterableField()
+          relationName!: string
+        }
+
+        @ObjectType('TestJoinConditionsInfinite')
+        @QueryOptions({ filterDepth: Number.POSITIVE_INFINITY })
+        @FilterableRelation('filterableRelation', () => TestJoinConditionsInfiniteRelationADto)
+        class TestJoinConditionsInfiniteDto extends BaseType {
+          @FilterableField()
+          numberField!: number
+        }
+
+        const TestJoinConditionsFilter = FilterType(TestJoinConditionsInfiniteDto)
+        const TestJoinConditionsRelationAFilter = FilterType(TestJoinConditionsInfiniteRelationADto)
+
+        @Resolver()
+        class FilterTypeSpec {
+          @Query(() => Int)
+          testParent(
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            @Args('input', { type: () => TestJoinConditionsFilter }) input: unknown
+          ): number {
+            return 1
+          }
+
+          @Query(() => Int)
+          testRelation(
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            @Args('input', { type: () => TestJoinConditionsRelationAFilter }) input: unknown
+          ): number {
+            return 1
+          }
+        }
+
+        const schema = await generateSchema([FilterTypeSpec])
+        const relationFilter = getNamedType(
+          getQueryFilterInputType(schema, 'testParent').getFields().filterableRelation.type
+        ) as GraphQLInputObjectType
+
+        expect(getQueryFilterFieldNames(schema, 'testRelation')).not.toContain('on')
+        expect(Object.keys(relationFilter.getFields())).toContain('on')
+        expect(relationFilter.name).not.toBe(getQueryFilterInputType(schema, 'testRelation').name)
+        expect(schema).toMatchSnapshot()
+      })
+
+      it('should expose join conditions under a custom key', async () => {
+        @ObjectType('TestJoinConditionsCustomKey_RelationA')
+        @QueryOptions({ enableRelationJoinConditions: { field: 'joinOn' } })
+        class TestJoinConditionsCustomKeyRelationADto extends BaseType {
+          @FilterableField()
+          relationName!: string
+        }
+
+        @ObjectType('TestJoinConditionsCustomKey')
+        @FilterableRelation('filterableRelation', () => TestJoinConditionsCustomKeyRelationADto)
+        class TestJoinConditionsCustomKeyDto extends BaseType {
+          @FilterableField()
+          numberField!: number
+        }
+
+        const TestJoinConditionsFilter = FilterType(TestJoinConditionsCustomKeyDto)
+
+        @Resolver()
+        class FilterTypeSpec {
+          @Query(() => Int)
+          test(
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            @Args('input', { type: () => TestJoinConditionsFilter }) input: unknown
+          ): number {
+            return 1
+          }
+        }
+
+        const schema = await generateSchema([FilterTypeSpec])
+        const relationFilter = getNamedType(
+          getQueryFilterInputType(schema, 'test').getFields().filterableRelation.type
+        ) as GraphQLInputObjectType
+
+        expect(Object.keys(relationFilter.getFields())).toContain('joinOn')
+        expect(Object.keys(relationFilter.getFields())).not.toContain('on')
+        expect(schema).toContain('input TestJoinConditionsCustomKey_RelationAOnConditionFilter')
+        expect(schema).toMatchSnapshot()
+      })
+
+      it('should inherit the option from a base dto', async () => {
+        @ObjectType({ isAbstract: true })
+        @QueryOptions({ enableRelationJoinConditions: true })
+        class JoinConditionsEnabledBaseType extends BaseType {}
+
+        @ObjectType('TestJoinConditionsInherited_RelationA')
+        class TestJoinConditionsInheritedRelationADto extends JoinConditionsEnabledBaseType {
+          @FilterableField()
+          relationName!: string
+        }
+
+        @ObjectType('TestJoinConditionsInherited')
+        @FilterableRelation('filterableRelation', () => TestJoinConditionsInheritedRelationADto)
+        class TestJoinConditionsInheritedDto extends BaseType {
+          @FilterableField()
+          numberField!: number
+        }
+
+        const TestJoinConditionsFilter = FilterType(TestJoinConditionsInheritedDto)
+
+        @Resolver()
+        class FilterTypeSpec {
+          @Query(() => Int)
+          test(
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            @Args('input', { type: () => TestJoinConditionsFilter }) input: unknown
+          ): number {
+            return 1
+          }
+        }
+
+        const schema = await generateSchema([FilterTypeSpec])
+        const relationFilter = getNamedType(
+          getQueryFilterInputType(schema, 'test').getFields().filterableRelation.type
+        ) as GraphQLInputObjectType
+
+        expect(Object.keys(relationFilter.getFields())).toContain('on')
+        expect(schema).toContain('input TestJoinConditionsInherited_RelationAOnConditionFilter')
+      })
+
+      it('should leave a dtos own `on` field alone when the option is off', async () => {
+        @ObjectType('TestJoinConditionsRealOnField_RelationA')
+        class TestJoinConditionsRealOnFieldRelationADto extends BaseType {
+          @FilterableField()
+          on!: string
+        }
+
+        @ObjectType('TestJoinConditionsRealOnField')
+        @FilterableRelation('filterableRelation', () => TestJoinConditionsRealOnFieldRelationADto)
+        class TestJoinConditionsRealOnFieldDto extends BaseType {
+          @FilterableField()
+          numberField!: number
+        }
+
+        const TestJoinConditionsFilter = FilterType(TestJoinConditionsRealOnFieldDto)
+
+        @Resolver()
+        class FilterTypeSpec {
+          @Query(() => Int)
+          test(
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            @Args('input', { type: () => TestJoinConditionsFilter }) input: unknown
+          ): number {
+            return 1
+          }
+        }
+
+        const schema = await generateSchema([FilterTypeSpec])
+        const relationFilter = getNamedType(
+          getQueryFilterInputType(schema, 'test').getFields().filterableRelation.type
+        ) as GraphQLInputObjectType
+
+        expect(getNamedType(relationFilter.getFields().on.type).name).toBe('StringFieldComparison')
+        expect(schema).not.toContain('TestJoinConditionsRealOnField_RelationAOnConditionFilter')
+      })
+
+      it('should throw when the reserved key is also a filterable field', () => {
+        @ObjectType('TestJoinConditionsFieldClash')
+        @QueryOptions({ enableRelationJoinConditions: true })
+        class TestJoinConditionsFieldClashDto extends BaseType {
+          @FilterableField()
+          on!: string
+        }
+
+        expect(() => FilterType(TestJoinConditionsFieldClashDto)).toThrow(
+          'TestJoinConditionsFieldClashDto enables relation join conditions under the key `on`, but also declares a field named `on`. ' +
+            "Reserve a different key with `@QueryOptions({ enableRelationJoinConditions: { field: '<name>' } })` on TestJoinConditionsFieldClashDto."
+        )
+      })
+
+      it('should throw when the reserved key is also a relation', () => {
+        @ObjectType('TestJoinConditionsRelationClash_RelationA')
+        class TestJoinConditionsRelationClashRelationADto extends BaseType {
+          @FilterableField()
+          relationName!: string
+        }
+
+        @ObjectType('TestJoinConditionsRelationClash')
+        @QueryOptions({ enableRelationJoinConditions: { field: 'joinedVia' } })
+        @FilterableRelation('joinedVia', () => TestJoinConditionsRelationClashRelationADto)
+        class TestJoinConditionsRelationClashDto extends BaseType {
+          @FilterableField()
+          numberField!: number
+        }
+
+        expect(() => FilterType(TestJoinConditionsRelationClashDto)).toThrow(
+          'TestJoinConditionsRelationClashDto enables relation join conditions under the key `joinedVia`, but also declares a relation named `joinedVia`.'
+        )
       })
     })
   })

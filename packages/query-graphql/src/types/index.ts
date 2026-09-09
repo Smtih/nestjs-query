@@ -27,6 +27,7 @@ export {
   CursorQueryArgsType,
   DeleteFilterType,
   FilterType,
+  FilterTypeOptions,
   NonePagingQueryArgsType,
   OffsetPagingType,
   OffsetQueryArgsType,
@@ -34,6 +35,10 @@ export {
   PagingTypes,
   QueryArgsType,
   QueryArgsTypeOpts,
+  RelationJoinConditionsOption,
+  RelationJoinConditionsOptions,
+  ReservedRelationJoinConditionKeyError,
+  resolveRelationJoinConditionKey,
   SubscriptionFilterType,
   UpdateFilterType
 } from './query'

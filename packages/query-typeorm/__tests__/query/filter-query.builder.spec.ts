@@ -5,11 +5,13 @@ import { DataSource, QueryBuilder, WhereExpressionBuilder } from 'typeorm'
 
 import { FilterQueryBuilder, WhereBuilder } from '../../src/query'
 import { createTestConnection } from '../__fixtures__/connection.fixture'
+import { enableRelationJoinConditions } from '../__fixtures__/relation-join-conditions.fixture'
 import { TestEntity } from '../__fixtures__/test.entity'
 import { TestSoftDeleteEntity } from '../__fixtures__/test-soft-delete.entity'
 
 describe('FilterQueryBuilder', (): void => {
   let connection: DataSource
+  beforeAll(enableRelationJoinConditions)
   beforeEach(async () => {
     connection = await createTestConnection()
   })
@@ -360,7 +362,7 @@ describe('FilterQueryBuilder', (): void => {
 
       it('should throw when join conditions are at the root filter level', () => {
         expect(() => expectJoinConditionSQLSnapshot({ filter: { on: { stringType: { eq: 'foo' } } } })).toThrow(
-          '`on` conditions are only supported at the top level of a relation filter, not at the root filter level.'
+          'Join conditions are only supported at the top level of a relation filter, not at the root filter level.'
         )
       })
 
@@ -370,7 +372,7 @@ describe('FilterQueryBuilder', (): void => {
             filter: { testRelations: { and: [{ on: { relationName: { eq: 'foo' } } }] } }
           })
         ).toThrow(
-          '`on` conditions are only supported at the top level of a relation filter, not inside an `and`/`or` expression.'
+          'Join conditions are only supported at the top level of a relation filter, not inside an `and`/`or` expression.'
         )
       })
     })

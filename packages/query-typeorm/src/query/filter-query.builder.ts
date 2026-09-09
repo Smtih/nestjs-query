@@ -2,8 +2,9 @@ import {
   AggregateQuery,
   AggregateQueryField,
   Filter,
+  findRelationJoinConditionKey,
   getFilterFields,
-  ON_CONDITION_KEY,
+  isReservedRelationJoinConditionKey,
   OnConditionFilter,
   Paging,
   Query,
@@ -398,7 +399,7 @@ export class FilterQueryBuilder<Entity> {
         )
       }
 
-      if (field === ON_CONDITION_KEY) {
+      if (isReservedRelationJoinConditionKey(field)) {
         return relations
       }
 
@@ -409,15 +410,33 @@ export class FilterQueryBuilder<Entity> {
       }
 
       const relationFilter = (filter as Record<string, Filter<unknown>>)[field]
+      const joinConditions = this.getJoinConditions(relationFilter)
 
       return {
         ...relations,
         [field]: merge(relations[field], {
           children: this.getReferencedRelationsRecursive(referencedRelation.inverseEntityMetadata, relationFilter),
-          ...(relationFilter.on ? { on: relationFilter.on } : undefined)
+          ...(joinConditions ? { on: joinConditions } : undefined)
         })
       }
     }, selectedRelations)
+  }
+
+  /**
+   * The conditions a relation filter asks to inject into the relation's `JOIN ... ON` clause.
+   *
+   * A filter arrives as a plain object with no DTO attached, so the reserved key holding the
+   * conditions is recognised through the process wide reservation the DTO made rather than looked
+   * up from the DTO itself.
+   */
+  private getJoinConditions(relationFilter: Filter<unknown>): OnConditionFilter<unknown> | undefined {
+    const joinConditionKey = findRelationJoinConditionKey(relationFilter)
+
+    if (!joinConditionKey) {
+      return undefined
+    }
+
+    return (relationFilter as Record<string, OnConditionFilter<unknown>>)[joinConditionKey]
   }
 
   private injectRelationsAliasRecursive(relations: NestedRecord, counter = new Map<string, number>()): NestedRelationsAliased {

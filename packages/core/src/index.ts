@@ -22,7 +22,6 @@ export {
   mergeFilter,
   mergeFilters,
   mergeQuery,
-  ON_CONDITION_KEY,
   QueryFieldMap,
   transformAggregateQuery,
   transformAggregateResponse,

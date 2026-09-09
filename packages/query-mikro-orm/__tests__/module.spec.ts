@@ -2,7 +2,11 @@ import { MikroORM } from '@mikro-orm/core'
 import { MikroOrmModule } from '@mikro-orm/nestjs'
 import { SqliteDriver } from '@mikro-orm/sqlite'
 import { Test, TestingModule } from '@nestjs/testing'
-import { getQueryServiceToken } from '@ptc-org/nestjs-query-core'
+import {
+  DEFAULT_RELATION_JOIN_CONDITION_KEY,
+  getQueryServiceToken,
+  reserveRelationJoinConditionKey
+} from '@ptc-org/nestjs-query-core'
 
 import { MikroOrmQueryService, NestjsQueryMikroOrmModule } from '../src'
 import { CONNECTION_OPTIONS, TestEntity, TestRelation } from './__fixtures__'
@@ -55,6 +59,16 @@ describe('NestjsQueryMikroOrmModule', () => {
 
       const service = moduleRef.get<MikroOrmQueryService<TestEntityDTO, TestEntity>>(getQueryServiceToken(TestEntityDTO))
       expect(service).toBeInstanceOf(MikroOrmQueryService)
+    })
+
+    it('should throw when a dto enables relation join conditions', () => {
+      class JoinConditionsDTO {}
+
+      reserveRelationJoinConditionKey(JoinConditionsDTO, DEFAULT_RELATION_JOIN_CONDITION_KEY)
+
+      expect(() => NestjsQueryMikroOrmModule.forFeature([{ entity: TestEntity, dto: JoinConditionsDTO }])).toThrow(
+        '`enableRelationJoinConditions` is enabled for JoinConditionsDTO but @ptc-org/nestjs-query-mikro-orm cannot inject conditions into a JOIN ON clause.'
+      )
     })
 
     it('should export MikroOrmModule', async () => {

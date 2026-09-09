@@ -1,14 +1,7 @@
+import { isReservedRelationJoinConditionKey } from '../common'
 import { Filter, FilterComparisons, FilterFieldComparison } from '../interfaces'
 import { FilterBuilder } from './filter.builder'
 import { QueryFieldMap } from './query.helpers'
-
-/**
- * The reserved filter key that holds a relation's `JOIN ... ON` conditions.
- *
- * It is not a field or relation name and is therefore skipped when collecting the fields a filter
- * references.
- */
-export const ON_CONDITION_KEY = 'on'
 
 export type LikeComparisonOperators = 'like' | 'notLike' | 'iLike' | 'notILike'
 export type InComparisonOperators = 'in' | 'notIn'
@@ -106,7 +99,7 @@ export const getFilterFields = <DTO>(filter: Filter<DTO>): string[] => {
           fields
         )
       }
-    } else if (filterField !== ON_CONDITION_KEY) {
+    } else if (!isReservedRelationJoinConditionKey(filterField)) {
       fields.add(filterField)
     }
 

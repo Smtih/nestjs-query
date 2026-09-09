@@ -733,6 +733,47 @@ export class TodoItemDTO {
 }
 ```
 
+### Relation Join Conditions[​](#relation-join-conditions 'Direct link to Relation Join Conditions')
+
+A relation filter can accept an `on` key whose conditions are injected into that relation's SQL `JOIN ... ON` clause instead of the `WHERE` clause. The key is off by default and is enabled with the `enableRelationJoinConditions` option on the DTO that appears as the relation.
+
+sub-task.dto.ts
+
+```ts
+import { FilterableField, IDField, QueryOptions } from '@ptc-org/nestjs-query-graphql'
+import { ObjectType, ID } from '@nestjs/graphql'
+
+@ObjectType('SubTask')
+@QueryOptions({ enableRelationJoinConditions: true })
+export class SubTaskDTO {
+
+  @IDField(() => ID)
+  id!: string
+
+  @FilterableField()
+  completed!: boolean
+}
+```
+
+`true` uses the default key `on`. Pass `{ field: '<name>' }` instead when the DTO already declares a field called `on`, because the key is the runtime property name as well as the GraphQL field name:
+
+```ts
+@ObjectType('SubTask')
+@QueryOptions({ enableRelationJoinConditions: { field: 'joinOn' } })
+export class SubTaskDTO {
+
+  @FilterableField()
+  on!: string
+}
+```
+
+The option is resolved from base classes too, so a shared base DTO can enable it once for everything that extends it. Enabling it on a DTO that also declares a filterable field or a relation named the same as the configured key throws at schema generation time.
+
+<Warning>
+  Relation join conditions only work for typeorm! The `sequelize`, `mongoose`, `typegoose` and `mikro-orm` adapters
+  throw from `forFeature` at application startup when they are asked to serve a DTO that enables the option.
+</Warning>
+
 ### Generated filter-type depth[​](#generated-filter-type-depth 'Direct link to Generated filter-type depth')
 
 When querying the default filter is one level deep. You can specify the generated filter-type depth by using the `filterDepth` option.

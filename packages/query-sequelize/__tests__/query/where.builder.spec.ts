@@ -1,4 +1,9 @@
-import { Filter } from '@ptc-org/nestjs-query-core'
+import {
+  clearReservedRelationJoinConditionKeys,
+  DEFAULT_RELATION_JOIN_CONDITION_KEY,
+  Filter,
+  reserveRelationJoinConditionKey
+} from '@ptc-org/nestjs-query-core'
 import { Op, WhereOptions } from 'sequelize'
 
 import { WhereBuilder } from '../../src/query'
@@ -12,8 +17,21 @@ describe('WhereBuilder', (): void => {
     expect(actual).toEqual(expectedWhereOpts)
   }
 
+  afterEach(clearReservedRelationJoinConditionKeys)
+
   it('should accept a empty filter', (): void => {
     expectWhereQuery({}, {})
+  })
+
+  it('should ignore a reserved join condition key', (): void => {
+    reserveRelationJoinConditionKey(TestEntity, DEFAULT_RELATION_JOIN_CONDITION_KEY)
+
+    const withJoinConditions = createWhereBuilder().build(
+      { on: { numberType: { gt: 1 } }, stringType: { like: 'foo%' } } as Filter<TestEntity>,
+      new Map()
+    )
+
+    expect(withJoinConditions).toEqual(createWhereBuilder().build({ stringType: { like: 'foo%' } }, new Map()))
   })
 
   it('or multiple operators for a single field together', (): void => {

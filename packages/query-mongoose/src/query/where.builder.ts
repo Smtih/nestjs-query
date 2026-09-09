@@ -1,4 +1,4 @@
-import { Filter, FilterComparisons, FilterFieldComparison } from '@ptc-org/nestjs-query-core'
+import { Filter, FilterComparisons, FilterFieldComparison, isReservedRelationJoinConditionKey } from '@ptc-org/nestjs-query-core'
 import { Document, Model as MongooseModel, QueryFilter } from 'mongoose'
 
 import { ComparisonBuilder, EntityComparisonField } from './comparison.builder'
@@ -53,6 +53,10 @@ export class WhereBuilder<Entity extends Document> {
     const keys = Object.keys(filter)
     // Converting to dot notation
     for (const key of keys) {
+      if (isReservedRelationJoinConditionKey(key)) {
+        continue
+      }
+
       const value = filter[key]
       if (!['and', 'or'].includes(key) && this.isGraphQLFilter(value)) {
         const subFilter = this.getNormalizedFilter(value as Filter<Entity>)
@@ -80,7 +84,7 @@ export class WhereBuilder<Entity extends Document> {
    */
   private filterFields(filter: Filter<Entity>): QueryFilter<Entity> | undefined {
     const ands = Object.keys(filter)
-      .filter((f) => f !== 'and' && f !== 'or')
+      .filter((f) => f !== 'and' && f !== 'or' && !isReservedRelationJoinConditionKey(f))
       .map((field) => this.withFilterComparison(field as keyof Entity, this.getField(filter, field as keyof Entity)))
     if (ands.length === 1) {
       return ands[0]
