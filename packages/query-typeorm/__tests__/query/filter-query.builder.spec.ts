@@ -1,4 +1,4 @@
-import { Class, Filter, Query, SortDirection, SortNulls } from '@ptc-org/nestjs-query-core'
+import { Class, Filter, Query, SelectRelation, SortDirection, SortNulls } from '@ptc-org/nestjs-query-core'
 import { format as formatSql } from 'sql-formatter'
 import { anything, deepEqual, instance, mock, verify, when } from 'ts-mockito'
 import { DataSource, QueryBuilder, WhereExpressionBuilder } from 'typeorm'
@@ -187,8 +187,15 @@ describe('FilterQueryBuilder', (): void => {
       const mockWhereBuilder = mock<WhereBuilder<TestEntity>>(WhereBuilder)
       const qb = getEntityQueryBuilder(TestEntity, instance(mockWhereBuilder))
       expect(qb.getReferencedRelationsRecursive(qb.repo.metadata, complexQuery)).toEqual({
-        oneTestRelation: { relationOfTestRelation: {} }
+        oneTestRelation: { children: { relationOfTestRelation: { children: {} } } }
       })
+    })
+    it('with a selected relation that is not a relation of the entity', () => {
+      const mockWhereBuilder = mock<WhereBuilder<TestEntity>>(WhereBuilder)
+      const qb = getEntityQueryBuilder(TestEntity, instance(mockWhereBuilder))
+      const selectRelations = [{ name: 'stringType', query: {} }] as SelectRelation<TestEntity>[]
+
+      expect(qb.getReferencedRelationsRecursive(qb.repo.metadata, {}, selectRelations)).toEqual({})
     })
     it('with nested and / or', () => {
       const mockWhereBuilder = mock<WhereBuilder<TestEntity>>(WhereBuilder)
@@ -226,7 +233,10 @@ describe('FilterQueryBuilder', (): void => {
             }
           ]
         } as Filter<TestEntity>)
-      ).toEqual({ testRelations: {}, oneTestRelation: { relationsOfTestRelation: {} } })
+      ).toEqual({
+        testRelations: { children: {} },
+        oneTestRelation: { children: { relationsOfTestRelation: { children: {} } } }
+      })
     })
   })
 
@@ -277,6 +287,91 @@ describe('FilterQueryBuilder', (): void => {
             }
           ]
         } as any)
+      })
+    })
+
+    describe('with relation join conditions', () => {
+      const expectJoinConditionSQLSnapshot = (query: Query<TestEntity>): void => {
+        expectSQLSnapshot(new FilterQueryBuilder(connection.getRepository(TestEntity)).select(query))
+      }
+
+      it('should add the join conditions to the LEFT JOIN instead of the WHERE clause', () => {
+        expectJoinConditionSQLSnapshot({
+          filter: { testRelations: { on: { relationName: { eq: 'foo' } } } }
+        })
+      })
+
+      it('should keep filtering in the WHERE clause for the same relation', () => {
+        expectJoinConditionSQLSnapshot({
+          filter: { testRelations: { on: { relationName: { eq: 'foo' } }, testRelationPk: { isNot: null } } }
+        })
+      })
+
+      it('should support boolean expressions inside the join conditions', () => {
+        expectJoinConditionSQLSnapshot({
+          filter: {
+            testRelations: {
+              on: { or: [{ relationName: { eq: 'foo' } }, { testEntityId: { is: null } }] }
+            }
+          }
+        })
+      })
+
+      it('should add the join conditions of a nested relation', () => {
+        expectJoinConditionSQLSnapshot({
+          filter: {
+            oneTestRelation: {
+              on: { relationName: { eq: 'foo' } },
+              relationsOfTestRelation: { on: { testRelationId: { is: null } } }
+            }
+          }
+        })
+      })
+
+      it('should merge the join conditions when the same relation is referenced twice', () => {
+        expectJoinConditionSQLSnapshot({
+          filter: {
+            and: [
+              { testRelations: { on: { relationName: { eq: 'foo' } } } },
+              { testRelations: { on: { testEntityId: { is: null } } } }
+            ]
+          }
+        })
+      })
+
+      it('should add the join conditions to a selected relation', () => {
+        expectJoinConditionSQLSnapshot({
+          filter: { oneTestRelation: { on: { relationName: { eq: 'foo' } } } },
+          relations: [{ name: 'oneTestRelation', query: {} }]
+        } as Query<TestEntity>)
+      })
+
+      it('should bind an in comparison in the join conditions', () => {
+        expectJoinConditionSQLSnapshot({
+          filter: { testRelations: { on: { relationName: { in: ['foo', 'bar'] } } } }
+        })
+      })
+
+      it('should bind a between comparison in the join conditions', () => {
+        expectJoinConditionSQLSnapshot({
+          filter: { testRelations: { on: { relationName: { between: { lower: 'a', upper: 'z' } } } } }
+        })
+      })
+
+      it('should throw when join conditions are at the root filter level', () => {
+        expect(() => expectJoinConditionSQLSnapshot({ filter: { on: { stringType: { eq: 'foo' } } } })).toThrow(
+          '`on` conditions are only supported at the top level of a relation filter, not at the root filter level.'
+        )
+      })
+
+      it('should throw when join conditions are inside a boolean expression', () => {
+        expect(() =>
+          expectJoinConditionSQLSnapshot({
+            filter: { testRelations: { and: [{ on: { relationName: { eq: 'foo' } } }] } }
+          })
+        ).toThrow(
+          '`on` conditions are only supported at the top level of a relation filter, not inside an `and`/`or` expression.'
+        )
       })
     })
 
@@ -400,6 +495,62 @@ describe('FilterQueryBuilder', (): void => {
             {
               paging: { limit: 10, offset: 3 },
               filter: { manyToOneRelation: { testRelationPk: { eq: 'test' } } }
+            },
+            instance(mockWhereBuilder)
+          )
+        })
+
+        const selectPagedByJoinConditions = (relation: keyof TestEntity) => {
+          const mockWhereBuilder = mock<WhereBuilder<TestEntity>>(WhereBuilder)
+          when(mockWhereBuilder.build(anything(), anything(), anything(), anything())).thenCall(
+            (qb: WhereExpressionBuilder) => qb
+          )
+
+          return getEntityQueryBuilder(TestEntity, instance(mockWhereBuilder)).select({
+            paging: { limit: 10, offset: 3 },
+            filter: { [relation]: { on: { relationName: { eq: 'foo' } } } }
+          }).expressionMap
+        }
+
+        it('should page a one to many relation with only join conditions by skip/take', () => {
+          const { take, skip, limit, offset } = selectPagedByJoinConditions('testRelations')
+
+          expect({ take, skip }).toEqual({ take: 10, skip: 3 })
+          expect({ limit, offset }).toEqual({ limit: undefined, offset: undefined })
+        })
+
+        it('should page a one to one relation with only join conditions by limit/offset', () => {
+          const { take, skip, limit, offset } = selectPagedByJoinConditions('oneTestRelation')
+
+          expect({ limit, offset }).toEqual({ limit: 10, offset: 3 })
+          expect({ take, skip }).toEqual({ take: undefined, skip: undefined })
+        })
+
+        it('should use skip/take when a one to many relation only has join conditions', () => {
+          const mockWhereBuilder = mock<WhereBuilder<TestEntity>>(WhereBuilder)
+          when(mockWhereBuilder.build(anything(), anything(), anything(), anything())).thenCall(
+            (qb: WhereExpressionBuilder) => qb
+          )
+
+          expectSelectSQLSnapshot(
+            {
+              paging: { limit: 10, offset: 3 },
+              filter: { testRelations: { on: { relationName: { eq: 'foo' } } } }
+            },
+            instance(mockWhereBuilder)
+          )
+        })
+
+        it('should use limit/offset when a one to one relation only has join conditions', () => {
+          const mockWhereBuilder = mock<WhereBuilder<TestEntity>>(WhereBuilder)
+          when(mockWhereBuilder.build(anything(), anything(), anything(), anything())).thenCall(
+            (qb: WhereExpressionBuilder) => qb
+          )
+
+          expectSelectSQLSnapshot(
+            {
+              paging: { limit: 10, offset: 3 },
+              filter: { oneTestRelation: { on: { relationName: { eq: 'foo' } } } }
             },
             instance(mockWhereBuilder)
           )

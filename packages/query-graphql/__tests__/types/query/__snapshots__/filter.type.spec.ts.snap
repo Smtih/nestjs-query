@@ -888,6 +888,11 @@ input TestFilterDepth_ShouldNotAffect_RelationADeepFilter {
   relationName: StringFieldComparison
   relationAge: NumberFieldComparison
   filterableRelation: TestRelationDtoDeepFilter
+
+  """
+  Conditions injected into this relation's JOIN ON clause rather than the WHERE clause, preserving LEFT JOIN semantics so parent rows without a matching child are kept. Only honoured at the top level of a relation filter: an \`on\` placed at the root filter level or inside an \`and\`/\`or\` expression is rejected.
+  """
+  on: TestFilterDepth_ShouldNotAffect_RelationAOnConditionFilter
 }
 
 input StringFieldComparison {
@@ -913,6 +918,27 @@ input TestRelationDtoDeepFilter {
   id: NumberFieldComparison
   relationName: StringFieldComparison
   relationAge: NumberFieldComparison
+
+  """
+  Conditions injected into this relation's JOIN ON clause rather than the WHERE clause, preserving LEFT JOIN semantics so parent rows without a matching child are kept. Only honoured at the top level of a relation filter: an \`on\` placed at the root filter level or inside an \`and\`/\`or\` expression is rejected.
+  """
+  on: TestRelationDtoOnConditionFilter
+}
+
+input TestRelationDtoOnConditionFilter {
+  and: [TestRelationDtoOnConditionFilter!]
+  or: [TestRelationDtoOnConditionFilter!]
+  id: NumberFieldComparison
+  relationName: StringFieldComparison
+  relationAge: NumberFieldComparison
+}
+
+input TestFilterDepth_ShouldNotAffect_RelationAOnConditionFilter {
+  and: [TestFilterDepth_ShouldNotAffect_RelationAOnConditionFilter!]
+  or: [TestFilterDepth_ShouldNotAffect_RelationAOnConditionFilter!]
+  id: NumberFieldComparison
+  relationName: StringFieldComparison
+  relationAge: NumberFieldComparison
 }
 
 input TestFilterDepth_ShouldNotAffect_RelationAFilter {
@@ -930,6 +956,11 @@ input TestFilterDepth_ShouldNotAffect_RelationAFilterTestRelationDtoFilter {
   id: NumberFieldComparison
   relationName: StringFieldComparison
   relationAge: NumberFieldComparison
+
+  """
+  Conditions injected into this relation's JOIN ON clause rather than the WHERE clause, preserving LEFT JOIN semantics so parent rows without a matching child are kept. Only honoured at the top level of a relation filter: an \`on\` placed at the root filter level or inside an \`and\`/\`or\` expression is rejected.
+  """
+  on: TestRelationDtoOnConditionFilter
 }"
 `;
 
@@ -1081,6 +1112,11 @@ input TestFilterDepth_1FilterTestFilterDepth_1_RelationAFilter {
   id: NumberFieldComparison
   relationName: StringFieldComparison
   relationAge: NumberFieldComparison
+
+  """
+  Conditions injected into this relation's JOIN ON clause rather than the WHERE clause, preserving LEFT JOIN semantics so parent rows without a matching child are kept. Only honoured at the top level of a relation filter: an \`on\` placed at the root filter level or inside an \`and\`/\`or\` expression is rejected.
+  """
+  on: TestFilterDepth_1_RelationAOnConditionFilter
 }
 
 input StringFieldComparison {
@@ -1098,6 +1134,14 @@ input StringFieldComparison {
   notILike: String
   in: [String!]
   notIn: [String!]
+}
+
+input TestFilterDepth_1_RelationAOnConditionFilter {
+  and: [TestFilterDepth_1_RelationAOnConditionFilter!]
+  or: [TestFilterDepth_1_RelationAOnConditionFilter!]
+  id: NumberFieldComparison
+  relationName: StringFieldComparison
+  relationAge: NumberFieldComparison
 }"
 `;
 
@@ -1179,6 +1223,11 @@ input TestFilterDepth_2FilterTestFilterDepth_2_RelationAFilter {
   relationName: StringFieldComparison
   relationAge: NumberFieldComparison
   filterableRelation: TestFilterDepth_2FilterTestFilterDepth_2_RelationAFilterTestRelationDtoFilter
+
+  """
+  Conditions injected into this relation's JOIN ON clause rather than the WHERE clause, preserving LEFT JOIN semantics so parent rows without a matching child are kept. Only honoured at the top level of a relation filter: an \`on\` placed at the root filter level or inside an \`and\`/\`or\` expression is rejected.
+  """
+  on: TestFilterDepth_2_RelationAOnConditionFilter
 }
 
 input StringFieldComparison {
@@ -1201,6 +1250,27 @@ input StringFieldComparison {
 input TestFilterDepth_2FilterTestFilterDepth_2_RelationAFilterTestRelationDtoFilter {
   and: [TestFilterDepth_2FilterTestFilterDepth_2_RelationAFilterTestRelationDtoFilter!]
   or: [TestFilterDepth_2FilterTestFilterDepth_2_RelationAFilterTestRelationDtoFilter!]
+  id: NumberFieldComparison
+  relationName: StringFieldComparison
+  relationAge: NumberFieldComparison
+
+  """
+  Conditions injected into this relation's JOIN ON clause rather than the WHERE clause, preserving LEFT JOIN semantics so parent rows without a matching child are kept. Only honoured at the top level of a relation filter: an \`on\` placed at the root filter level or inside an \`and\`/\`or\` expression is rejected.
+  """
+  on: TestRelationDtoOnConditionFilter
+}
+
+input TestRelationDtoOnConditionFilter {
+  and: [TestRelationDtoOnConditionFilter!]
+  or: [TestRelationDtoOnConditionFilter!]
+  id: NumberFieldComparison
+  relationName: StringFieldComparison
+  relationAge: NumberFieldComparison
+}
+
+input TestFilterDepth_2_RelationAOnConditionFilter {
+  and: [TestFilterDepth_2_RelationAOnConditionFilter!]
+  or: [TestFilterDepth_2_RelationAOnConditionFilter!]
   id: NumberFieldComparison
   relationName: StringFieldComparison
   relationAge: NumberFieldComparison
@@ -1285,6 +1355,11 @@ input TestFilterDepth_Infinite_RelationADeepFilter {
   relationName: StringFieldComparison
   relationAge: NumberFieldComparison
   filterableRelation: TestRelationDtoDeepFilter
+
+  """
+  Conditions injected into this relation's JOIN ON clause rather than the WHERE clause, preserving LEFT JOIN semantics so parent rows without a matching child are kept. Only honoured at the top level of a relation filter: an \`on\` placed at the root filter level or inside an \`and\`/\`or\` expression is rejected.
+  """
+  on: TestFilterDepth_Infinite_RelationAOnConditionFilter
 }
 
 input StringFieldComparison {
@@ -1307,6 +1382,27 @@ input StringFieldComparison {
 input TestRelationDtoDeepFilter {
   and: [TestRelationDtoDeepFilter!]
   or: [TestRelationDtoDeepFilter!]
+  id: NumberFieldComparison
+  relationName: StringFieldComparison
+  relationAge: NumberFieldComparison
+
+  """
+  Conditions injected into this relation's JOIN ON clause rather than the WHERE clause, preserving LEFT JOIN semantics so parent rows without a matching child are kept. Only honoured at the top level of a relation filter: an \`on\` placed at the root filter level or inside an \`and\`/\`or\` expression is rejected.
+  """
+  on: TestRelationDtoOnConditionFilter
+}
+
+input TestRelationDtoOnConditionFilter {
+  and: [TestRelationDtoOnConditionFilter!]
+  or: [TestRelationDtoOnConditionFilter!]
+  id: NumberFieldComparison
+  relationName: StringFieldComparison
+  relationAge: NumberFieldComparison
+}
+
+input TestFilterDepth_Infinite_RelationAOnConditionFilter {
+  and: [TestFilterDepth_Infinite_RelationAOnConditionFilter!]
+  or: [TestFilterDepth_Infinite_RelationAOnConditionFilter!]
   id: NumberFieldComparison
   relationName: StringFieldComparison
   relationAge: NumberFieldComparison
@@ -1491,6 +1587,11 @@ input TestFilterDepth_ShouldNotAffect_RelationADeepFilter {
   relationAge: NumberFieldComparison
   filterableRelation2: TestRelationDtoDeepFilter
   filterableRelation1: TestRelationDtoDeepFilter
+
+  """
+  Conditions injected into this relation's JOIN ON clause rather than the WHERE clause, preserving LEFT JOIN semantics so parent rows without a matching child are kept. Only honoured at the top level of a relation filter: an \`on\` placed at the root filter level or inside an \`and\`/\`or\` expression is rejected.
+  """
+  on: TestFilterDepth_ShouldNotAffect_RelationAOnConditionFilter
 }
 
 input StringFieldComparison {
@@ -1516,6 +1617,27 @@ input TestRelationDtoDeepFilter {
   id: NumberFieldComparison
   relationName: StringFieldComparison
   relationAge: NumberFieldComparison
+
+  """
+  Conditions injected into this relation's JOIN ON clause rather than the WHERE clause, preserving LEFT JOIN semantics so parent rows without a matching child are kept. Only honoured at the top level of a relation filter: an \`on\` placed at the root filter level or inside an \`and\`/\`or\` expression is rejected.
+  """
+  on: TestRelationDtoOnConditionFilter
+}
+
+input TestRelationDtoOnConditionFilter {
+  and: [TestRelationDtoOnConditionFilter!]
+  or: [TestRelationDtoOnConditionFilter!]
+  id: NumberFieldComparison
+  relationName: StringFieldComparison
+  relationAge: NumberFieldComparison
+}
+
+input TestFilterDepth_ShouldNotAffect_RelationAOnConditionFilter {
+  and: [TestFilterDepth_ShouldNotAffect_RelationAOnConditionFilter!]
+  or: [TestFilterDepth_ShouldNotAffect_RelationAOnConditionFilter!]
+  id: NumberFieldComparison
+  relationName: StringFieldComparison
+  relationAge: NumberFieldComparison
 }
 
 input TestFilterDepth_ShouldNotAffect_RelationAFilter {
@@ -1534,6 +1656,11 @@ input TestFilterDepth_ShouldNotAffect_RelationAFilterTestRelationDtoFilter {
   id: NumberFieldComparison
   relationName: StringFieldComparison
   relationAge: NumberFieldComparison
+
+  """
+  Conditions injected into this relation's JOIN ON clause rather than the WHERE clause, preserving LEFT JOIN semantics so parent rows without a matching child are kept. Only honoured at the top level of a relation filter: an \`on\` placed at the root filter level or inside an \`and\`/\`or\` expression is rejected.
+  """
+  on: TestRelationDtoOnConditionFilter
 }"
 `;
 
@@ -1870,6 +1997,19 @@ input TimestampFieldComparisonBetween {
 input TestFilterDtoFilterTestRelationDtoFilter {
   and: [TestFilterDtoFilterTestRelationDtoFilter!]
   or: [TestFilterDtoFilterTestRelationDtoFilter!]
+  id: NumberFieldComparison
+  relationName: StringFieldComparison
+  relationAge: NumberFieldComparison
+
+  """
+  Conditions injected into this relation's JOIN ON clause rather than the WHERE clause, preserving LEFT JOIN semantics so parent rows without a matching child are kept. Only honoured at the top level of a relation filter: an \`on\` placed at the root filter level or inside an \`and\`/\`or\` expression is rejected.
+  """
+  on: TestRelationDtoOnConditionFilter
+}
+
+input TestRelationDtoOnConditionFilter {
+  and: [TestRelationDtoOnConditionFilter!]
+  or: [TestRelationDtoOnConditionFilter!]
   id: NumberFieldComparison
   relationName: StringFieldComparison
   relationAge: NumberFieldComparison

@@ -176,6 +176,18 @@ describe('filter types', (): void => {
       expect(filterInstance.or[0]).toBeInstanceOf(TestGraphQLFilter)
     })
 
+    it('should convert relation join conditions to filter class', () => {
+      const filterObject = {
+        filterableRelation: { on: { relationName: { eq: 'foo' } } }
+      } as Filter<TestDto>
+
+      const filterInstance = plainToClass(TestDtoFilter, filterObject) as Record<string, Filter<TestRelation>>
+      const relationFilter = filterInstance.filterableRelation
+
+      expect(relationFilter.on.relationName.eq).toBe('foo')
+      expect(relationFilter.on.constructor.name).toBe('GraphQLFilter')
+    })
+
     it('should create filter for sub objects', () => {
       @ObjectType('TestSubObjectType')
       class TestSubObjectType {

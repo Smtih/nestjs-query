@@ -113,6 +113,26 @@ OFFSET
   11"
 `;
 
+exports[`FilterQueryBuilder #select with paging skip/take - limit/offset should use limit/offset when a one to one relation only has join conditions 1`] = `
+"SELECT
+  "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
+  "TestEntity"."string_type" AS "TestEntity_string_type",
+  "TestEntity"."bool_type" AS "TestEntity_bool_type",
+  "TestEntity"."number_type" AS "TestEntity_number_type",
+  "TestEntity"."date_type" AS "TestEntity_date_type",
+  "TestEntity"."many_to_one_relation_id" AS "TestEntity_many_to_one_relation_id",
+  "TestEntity"."many_to_one_soft_delete_relation_id" AS "TestEntity_many_to_one_soft_delete_relation_id",
+  "TestEntity"."oneTestRelationTestRelationPk" AS "TestEntity_oneTestRelationTestRelationPk"
+FROM
+  "test_entity" "TestEntity"
+  LEFT JOIN "test_relation" "oneTestRelation" ON "oneTestRelation"."test_relation_pk" = "TestEntity"."oneTestRelationTestRelationPk"
+  AND ("oneTestRelation"."relation_name" = foo)
+LIMIT
+  10
+OFFSET
+  3"
+`;
+
 exports[`FilterQueryBuilder #select with paging skip/take - limit/offset should use limit/offset when filtering on many to one relation 1`] = `
 "SELECT
   "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
@@ -195,6 +215,22 @@ OFFSET
   3"
 `;
 
+exports[`FilterQueryBuilder #select with paging skip/take - limit/offset should use skip/take when a one to many relation only has join conditions 1`] = `
+"SELECT
+  "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
+  "TestEntity"."string_type" AS "TestEntity_string_type",
+  "TestEntity"."bool_type" AS "TestEntity_bool_type",
+  "TestEntity"."number_type" AS "TestEntity_number_type",
+  "TestEntity"."date_type" AS "TestEntity_date_type",
+  "TestEntity"."many_to_one_relation_id" AS "TestEntity_many_to_one_relation_id",
+  "TestEntity"."many_to_one_soft_delete_relation_id" AS "TestEntity_many_to_one_soft_delete_relation_id",
+  "TestEntity"."oneTestRelationTestRelationPk" AS "TestEntity_oneTestRelationTestRelationPk"
+FROM
+  "test_entity" "TestEntity"
+  LEFT JOIN "test_relation" "testRelations" ON "testRelations"."test_entity_id" = "TestEntity"."test_entity_pk"
+  AND ("testRelations"."relation_name" = foo)"
+`;
+
 exports[`FilterQueryBuilder #select with paging skip/take - limit/offset should use skip/take when filtering on many to many relation 1`] = `
 "SELECT
   "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
@@ -261,6 +297,164 @@ exports[`FilterQueryBuilder #select with paging skip/take - limit/offset should 
 FROM
   "test_entity" "TestEntity"
   LEFT JOIN "test_relation" "testRelations" ON "testRelations"."test_entity_id" = "TestEntity"."test_entity_pk""
+`;
+
+exports[`FilterQueryBuilder #select with relation join conditions should add the join conditions of a nested relation 1`] = `
+"SELECT
+  "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
+  "TestEntity"."string_type" AS "TestEntity_string_type",
+  "TestEntity"."bool_type" AS "TestEntity_bool_type",
+  "TestEntity"."number_type" AS "TestEntity_number_type",
+  "TestEntity"."date_type" AS "TestEntity_date_type",
+  "TestEntity"."many_to_one_relation_id" AS "TestEntity_many_to_one_relation_id",
+  "TestEntity"."many_to_one_soft_delete_relation_id" AS "TestEntity_many_to_one_soft_delete_relation_id",
+  "TestEntity"."oneTestRelationTestRelationPk" AS "TestEntity_oneTestRelationTestRelationPk"
+FROM
+  "test_entity" "TestEntity"
+  LEFT JOIN (
+    "test_relation" "oneTestRelation"
+    LEFT JOIN "relation_of_test_relation_entity" "relationsOfTestRelation" ON "relationsOfTestRelation"."test_relation_id" = "oneTestRelation"."test_relation_pk"
+    AND (
+      "relationsOfTestRelation"."test_relation_id" IS NULL
+    )
+  ) ON "oneTestRelation"."test_relation_pk" = "TestEntity"."oneTestRelationTestRelationPk"
+  AND ("oneTestRelation"."relation_name" = foo)
+WHERE
+  (1 = 1)"
+`;
+
+exports[`FilterQueryBuilder #select with relation join conditions should add the join conditions to a selected relation 1`] = `
+"SELECT
+  "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
+  "TestEntity"."string_type" AS "TestEntity_string_type",
+  "TestEntity"."bool_type" AS "TestEntity_bool_type",
+  "TestEntity"."number_type" AS "TestEntity_number_type",
+  "TestEntity"."date_type" AS "TestEntity_date_type",
+  "TestEntity"."many_to_one_relation_id" AS "TestEntity_many_to_one_relation_id",
+  "TestEntity"."many_to_one_soft_delete_relation_id" AS "TestEntity_many_to_one_soft_delete_relation_id",
+  "TestEntity"."oneTestRelationTestRelationPk" AS "TestEntity_oneTestRelationTestRelationPk",
+  "oneTestRelation"."test_relation_pk" AS "oneTestRelation_test_relation_pk",
+  "oneTestRelation"."relation_name" AS "oneTestRelation_relation_name",
+  "oneTestRelation"."test_entity_id" AS "oneTestRelation_test_entity_id",
+  "oneTestRelation"."uni_directional_test_entity_id" AS "oneTestRelation_uni_directional_test_entity_id",
+  "oneTestRelation"."uni_directional_relation_test_entity_id" AS "oneTestRelation_uni_directional_relation_test_entity_id"
+FROM
+  "test_entity" "TestEntity"
+  LEFT JOIN "test_relation" "oneTestRelation" ON "oneTestRelation"."test_relation_pk" = "TestEntity"."oneTestRelationTestRelationPk"
+  AND ("oneTestRelation"."relation_name" = foo)"
+`;
+
+exports[`FilterQueryBuilder #select with relation join conditions should add the join conditions to the LEFT JOIN instead of the WHERE clause 1`] = `
+"SELECT
+  "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
+  "TestEntity"."string_type" AS "TestEntity_string_type",
+  "TestEntity"."bool_type" AS "TestEntity_bool_type",
+  "TestEntity"."number_type" AS "TestEntity_number_type",
+  "TestEntity"."date_type" AS "TestEntity_date_type",
+  "TestEntity"."many_to_one_relation_id" AS "TestEntity_many_to_one_relation_id",
+  "TestEntity"."many_to_one_soft_delete_relation_id" AS "TestEntity_many_to_one_soft_delete_relation_id",
+  "TestEntity"."oneTestRelationTestRelationPk" AS "TestEntity_oneTestRelationTestRelationPk"
+FROM
+  "test_entity" "TestEntity"
+  LEFT JOIN "test_relation" "testRelations" ON "testRelations"."test_entity_id" = "TestEntity"."test_entity_pk"
+  AND ("testRelations"."relation_name" = foo)"
+`;
+
+exports[`FilterQueryBuilder #select with relation join conditions should bind a between comparison in the join conditions 1`] = `
+"SELECT
+  "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
+  "TestEntity"."string_type" AS "TestEntity_string_type",
+  "TestEntity"."bool_type" AS "TestEntity_bool_type",
+  "TestEntity"."number_type" AS "TestEntity_number_type",
+  "TestEntity"."date_type" AS "TestEntity_date_type",
+  "TestEntity"."many_to_one_relation_id" AS "TestEntity_many_to_one_relation_id",
+  "TestEntity"."many_to_one_soft_delete_relation_id" AS "TestEntity_many_to_one_soft_delete_relation_id",
+  "TestEntity"."oneTestRelationTestRelationPk" AS "TestEntity_oneTestRelationTestRelationPk"
+FROM
+  "test_entity" "TestEntity"
+  LEFT JOIN "test_relation" "testRelations" ON "testRelations"."test_entity_id" = "TestEntity"."test_entity_pk"
+  AND ("testRelations"."relation_name" BETWEEN a AND z)"
+`;
+
+exports[`FilterQueryBuilder #select with relation join conditions should bind an in comparison in the join conditions 1`] = `
+"SELECT
+  "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
+  "TestEntity"."string_type" AS "TestEntity_string_type",
+  "TestEntity"."bool_type" AS "TestEntity_bool_type",
+  "TestEntity"."number_type" AS "TestEntity_number_type",
+  "TestEntity"."date_type" AS "TestEntity_date_type",
+  "TestEntity"."many_to_one_relation_id" AS "TestEntity_many_to_one_relation_id",
+  "TestEntity"."many_to_one_soft_delete_relation_id" AS "TestEntity_many_to_one_soft_delete_relation_id",
+  "TestEntity"."oneTestRelationTestRelationPk" AS "TestEntity_oneTestRelationTestRelationPk"
+FROM
+  "test_entity" "TestEntity"
+  LEFT JOIN "test_relation" "testRelations" ON "testRelations"."test_entity_id" = "TestEntity"."test_entity_pk"
+  AND ("testRelations"."relation_name" IN (foo, bar))"
+`;
+
+exports[`FilterQueryBuilder #select with relation join conditions should keep filtering in the WHERE clause for the same relation 1`] = `
+"SELECT
+  "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
+  "TestEntity"."string_type" AS "TestEntity_string_type",
+  "TestEntity"."bool_type" AS "TestEntity_bool_type",
+  "TestEntity"."number_type" AS "TestEntity_number_type",
+  "TestEntity"."date_type" AS "TestEntity_date_type",
+  "TestEntity"."many_to_one_relation_id" AS "TestEntity_many_to_one_relation_id",
+  "TestEntity"."many_to_one_soft_delete_relation_id" AS "TestEntity_many_to_one_soft_delete_relation_id",
+  "TestEntity"."oneTestRelationTestRelationPk" AS "TestEntity_oneTestRelationTestRelationPk"
+FROM
+  "test_entity" "TestEntity"
+  LEFT JOIN "test_relation" "testRelations" ON "testRelations"."test_entity_id" = "TestEntity"."test_entity_pk"
+  AND ("testRelations"."relation_name" = foo)
+WHERE
+  (("testRelations"."test_relation_pk" IS NOT NULL))"
+`;
+
+exports[`FilterQueryBuilder #select with relation join conditions should merge the join conditions when the same relation is referenced twice 1`] = `
+"SELECT
+  "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
+  "TestEntity"."string_type" AS "TestEntity_string_type",
+  "TestEntity"."bool_type" AS "TestEntity_bool_type",
+  "TestEntity"."number_type" AS "TestEntity_number_type",
+  "TestEntity"."date_type" AS "TestEntity_date_type",
+  "TestEntity"."many_to_one_relation_id" AS "TestEntity_many_to_one_relation_id",
+  "TestEntity"."many_to_one_soft_delete_relation_id" AS "TestEntity_many_to_one_soft_delete_relation_id",
+  "TestEntity"."oneTestRelationTestRelationPk" AS "TestEntity_oneTestRelationTestRelationPk"
+FROM
+  "test_entity" "TestEntity"
+  LEFT JOIN "test_relation" "testRelations" ON "testRelations"."test_entity_id" = "TestEntity"."test_entity_pk"
+  AND (
+    (
+      "testRelations"."relation_name" = foo
+      AND "testRelations"."test_entity_id" IS NULL
+    )
+  )
+WHERE
+  (
+    (1 = 1)
+    AND (1 = 1)
+  )"
+`;
+
+exports[`FilterQueryBuilder #select with relation join conditions should support boolean expressions inside the join conditions 1`] = `
+"SELECT
+  "TestEntity"."test_entity_pk" AS "TestEntity_test_entity_pk",
+  "TestEntity"."string_type" AS "TestEntity_string_type",
+  "TestEntity"."bool_type" AS "TestEntity_bool_type",
+  "TestEntity"."number_type" AS "TestEntity_number_type",
+  "TestEntity"."date_type" AS "TestEntity_date_type",
+  "TestEntity"."many_to_one_relation_id" AS "TestEntity_many_to_one_relation_id",
+  "TestEntity"."many_to_one_soft_delete_relation_id" AS "TestEntity_many_to_one_soft_delete_relation_id",
+  "TestEntity"."oneTestRelationTestRelationPk" AS "TestEntity_oneTestRelationTestRelationPk"
+FROM
+  "test_entity" "TestEntity"
+  LEFT JOIN "test_relation" "testRelations" ON "testRelations"."test_entity_id" = "TestEntity"."test_entity_pk"
+  AND (
+    (
+      "testRelations"."relation_name" = foo
+      OR "testRelations"."test_entity_id" IS NULL
+    )
+  )"
 `;
 
 exports[`FilterQueryBuilder #select with relation should select and map relation 1`] = `

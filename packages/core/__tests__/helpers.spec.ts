@@ -192,6 +192,15 @@ describe('applyFilter', () => {
     expect(applyFilter({ first: 'bar', last: 'foo' }, filter)).toBe(false)
   })
 
+  it('should ignore join conditions, which have no in memory equivalent', () => {
+    const filter: Filter<TestDTO> = {
+      on: { first: { eq: 'never-matches' } },
+      last: { eq: 'bar' }
+    }
+    expect(applyFilter({ first: 'foo', last: 'bar' }, filter)).toBe(true)
+    expect(applyFilter({ first: 'foo', last: 'foo' }, filter)).toBe(false)
+  })
+
   it('should handle neq comparisons', () => {
     const filter: Filter<TestDTO> = {
       first: { neq: 'foo' }
@@ -672,6 +681,17 @@ describe('getFilterFields', () => {
       }
     }
     expect(getFilterFields(filter).sort()).toEqual(['boolField', 'strField', 'testRelation'])
+  })
+
+  it('should not treat join conditions as a field', () => {
+    const filter: Filter<Test> = {
+      strField: { eq: '' },
+      testRelation: {
+        on: { boolField: { is: false } }
+      }
+    }
+    expect(getFilterFields(filter).sort()).toEqual(['strField', 'testRelation'])
+    expect(getFilterFields(filter.testRelation as Filter<Test>)).toEqual([])
   })
 })
 
