@@ -83,7 +83,44 @@ Filtering on a relation normally constrains the parent records: a `todoItem` is 
 
 Conditions under `on` are added to that relation's SQL `JOIN ... ON` clause rather than the `WHERE` clause, so the `LEFT JOIN` keeps parents that have no matching child.
 
-<Warning>This functionality only works for typeorm!</Warning>
+The feature is opt-in and off by default. Enable it on the DTO that appears as the relation, and the `on` field is added wherever that DTO is used as a filterable relation:
+
+```ts
+@ObjectType('SubTask')
+@QueryOptions({ enableRelationJoinConditions: true })
+export class SubTaskDTO {
+  @FilterableField()
+  completed!: boolean
+}
+```
+
+With the option off, neither the `on` field nor the `SubTaskOnConditionFilter` input type is generated at all.
+
+`enableRelationJoinConditions` also accepts an object, which lets you choose the key. Use it when the DTO already has a field called `on`, since the key is the runtime property name as well as the GraphQL field name:
+
+```ts
+@ObjectType('SubTask')
+@QueryOptions({ enableRelationJoinConditions: { field: 'joinOn' } })
+export class SubTaskDTO {
+  @FilterableField()
+  on!: string
+}
+```
+
+Enabling the option on a DTO whose own filterable field or relation is named the same as the configured key throws at schema generation time, naming the DTO and the clashing member.
+
+The option is inherited, so a shared base DTO can turn it on once for every DTO that extends it:
+
+```ts
+@ObjectType({ isAbstract: true })
+@QueryOptions({ enableRelationJoinConditions: true })
+export abstract class JoinableDTO {}
+```
+
+<Warning>
+  This functionality only works for typeorm! The `sequelize`, `mongoose`, `typegoose` and `mikro-orm` adapters throw
+  from `forFeature` at application startup when they are asked to serve a DTO that enables it.
+</Warning>
 
 ```graphql
 {
@@ -115,7 +152,7 @@ Both forms can be used on the same relation. Here the join only matches uncomple
 
 The generated `on` input accepts the relation's own fields plus `and` and `or`. It deliberately has no relation fields, since a join condition can only reference the relation being joined.
 
-Because the conditions are applied to a `LEFT JOIN`, a to-many relation yields one row per matching child, so an unpaged query can return the same parent more than once. Paged queries are not affected, because paging uses a distinct-id subquery. This is ordinary SQL join behaviour rather than anything specific to `on`, but `on` makes it easy to run into, since keeping every parent is the whole point.
+Joining a to-many relation produces one row per matching child, but queries, counts and paging all account for that already, so records are not returned twice. Aggregates are the exception: they read raw rows, so an aggregate over a to-many relation counts each parent once per matching child. That applies to any relation filter rather than to `on` specifically, but `on` makes it easier to reach, since keeping every parent is the whole point.
 
 <Warning>
   `on` is only honoured at the top level of a relation filter. An `on` at the root filter level, or inside an `and`/`or`

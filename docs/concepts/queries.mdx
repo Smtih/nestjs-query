@@ -120,7 +120,12 @@ const q: Query<MyClass> = {
 
 A relation filter also accepts an `on` key. Its conditions are added to that relation's SQL `JOIN ... ON` clause instead of the `WHERE` clause, which preserves `LEFT JOIN` semantics: parent records without a matching child are still returned.
 
-<Warning>This functionality only works for typeorm!</Warning>
+The key is opt-in and off by default. In a GraphQL application it is enabled with `@QueryOptions({ enableRelationJoinConditions: true })` on the DTO that appears as the relation, which can also be set once on a shared base DTO, and `@QueryOptions({ enableRelationJoinConditions: { field: 'joinOn' } })` picks a different key for a DTO that already has a field called `on`. See [filtering](../graphql/queries/filtering#filtering-a-relation-join-with-on) for the details.
+
+<Warning>
+  This functionality only works for typeorm! The `sequelize`, `mongoose`, `typegoose` and `mikro-orm` adapters throw
+  from `forFeature` at application startup when they are asked to serve a DTO that enables it.
+</Warning>
 
 In this example every `myClass` is returned, and only its uncompleted `subTasks` take part in the join: `LEFT JOIN sub_task ON sub_task.my_class_id = my_class.id AND sub_task.completed = FALSE`.
 
@@ -149,7 +154,7 @@ const q: Query<MyClass> = {
 
 Join conditions may be grouped with `and` and `or`, but they cannot reference further relations, because a join condition can only refer to the relation being joined.
 
-Because the conditions are applied to a `LEFT JOIN`, a to-many relation yields one row per matching child, so an unpaged query can return the same parent more than once. Paged queries are not affected, because paging uses a distinct-id subquery. This is ordinary SQL join behaviour rather than anything specific to `on`, but `on` makes it easy to run into, since keeping every parent is the whole point.
+Joining a to-many relation produces one row per matching child, but queries, counts and paging all account for that already, so records are not returned twice. Aggregates are the exception: they read raw rows, so an aggregate over a to-many relation counts each parent once per matching child. That applies to any relation filter rather than to `on` specifically, but `on` makes it easier to reach, since keeping every parent is the whole point.
 
 <Warning>
   `on` is only honoured at the top level of a relation filter. An `on` at the root filter level, or inside an `and`/`or`
