@@ -1,10 +1,12 @@
-import { Filter } from '@ptc-org/nestjs-query-core'
+import { Filter, FilterComparisonOperators } from '@ptc-org/nestjs-query-core'
 import { format as formatSql } from 'sql-formatter'
-import { DataSource } from 'typeorm'
+import { DataSource, Repository } from 'typeorm'
 
-import { WhereBuilder } from '../../src/query'
+import { EntityComparisonField, FilterQueryBuilder, SQLComparisonBuilder, WhereBuilder } from '../../src/query'
 import { createTestConnection } from '../__fixtures__/connection.fixture'
 import { TestEntity } from '../__fixtures__/test.entity'
+import { TestRelation } from '../__fixtures__/test-relation.entity'
+import { TestVirtualColumnEntity } from '../__fixtures__/test-virtual-column.entity'
 
 describe('WhereBuilder', (): void => {
   let dataSource: DataSource
@@ -93,6 +95,116 @@ describe('WhereBuilder', (): void => {
 
     it('should properly group OR with a sibling field comparison', (): void => {
       expectSQLSnapshot({ or: [{ numberType: { eq: 2 } }, { numberType: { gt: 10 } }], stringType: { eq: 'foo' } })
+    })
+  })
+
+  describe('custom SQLComparisonBuilder', (): void => {
+    class UpperCaseComparisonBuilder<Entity> extends SQLComparisonBuilder<Entity> {
+      public build<F extends keyof Entity>(
+        field: F,
+        cmp: FilterComparisonOperators<Entity[F]>,
+        val: EntityComparisonField<Entity, F>,
+        alias?: string
+      ) {
+        const { sql, params } = super.build(field, cmp, val, alias)
+
+        return { sql: sql.replace(/^(\S+)/, 'UPPER($1)'), params }
+      }
+    }
+
+    class CollatedComparisonBuilder<Entity> extends SQLComparisonBuilder<Entity> {
+      constructor(private readonly collation: string) {
+        super()
+      }
+
+      public build<F extends keyof Entity>(
+        field: F,
+        cmp: FilterComparisonOperators<Entity[F]>,
+        val: EntityComparisonField<Entity, F>,
+        alias?: string
+      ) {
+        const { sql, params } = super.build(field, cmp, val, alias)
+
+        return { sql: `${sql} COLLATE ${this.collation}`, params }
+      }
+    }
+
+    const relationFilter = { testRelations: { relationName: { eq: 'foo' } } } as Filter<TestEntity>
+
+    const getRelationNames = () => ({
+      testRelations: { alias: 'TestRelation', metadata: dataSource.getMetadata(TestRelation), relations: {} }
+    })
+
+    const buildRelationFilterSql = (sqlComparisonBuilder: SQLComparisonBuilder<TestEntity>): string => {
+      const [sql] = new WhereBuilder<TestEntity>(sqlComparisonBuilder)
+        .build(getQueryBuilder(), relationFilter, getRelationNames(), 'TestEntity')
+        .getQueryAndParameters()
+
+      return sql
+    }
+
+    const buildRootFilterSql = (sqlComparisonBuilder: SQLComparisonBuilder<TestEntity>, filter: Filter<TestEntity>): string => {
+      const [sql] = new WhereBuilder<TestEntity>(sqlComparisonBuilder)
+        .build(getQueryBuilder(), filter, {}, 'TestEntity')
+        .getQueryAndParameters()
+
+      return sql
+    }
+
+    const createRepoWithVirtualColumn = (databasePath: string) =>
+      ({
+        metadata: {
+          columns: [{ databasePath, isVirtualProperty: true, query: (alias: string) => `SELECT 1 FROM ${alias}` }]
+        }
+      }) as unknown as Repository<TestEntity>
+
+    it('should apply the custom comparison builder to relation comparisons', (): void => {
+      expect(buildRelationFilterSql(new UpperCaseComparisonBuilder<TestEntity>())).toContain('UPPER(TestRelation.relationName)')
+    })
+
+    it('should apply a subclass with its own constructor signature to relation comparisons', (): void => {
+      expect(buildRelationFilterSql(new CollatedComparisonBuilder<TestEntity>('BINARY'))).toContain('COLLATE BINARY')
+    })
+
+    it('should not resolve relation fields against the root entity metadata', (): void => {
+      const sqlComparisonBuilder = new SQLComparisonBuilder<TestEntity>(
+        SQLComparisonBuilder.DEFAULT_COMPARISON_MAP,
+        createRepoWithVirtualColumn('relationName')
+      )
+      const rootFilter = { relationName: { eq: 'foo' } } as unknown as Filter<TestEntity>
+
+      expect(buildRootFilterSql(sqlComparisonBuilder, rootFilter)).toContain('SELECT 1 FROM')
+      expect(buildRelationFilterSql(sqlComparisonBuilder)).toContain('TestRelation.relationName')
+      expect(buildRelationFilterSql(sqlComparisonBuilder)).not.toContain('SELECT 1 FROM')
+    })
+  })
+
+  describe('virtual columns', (): void => {
+    const buildVirtualColumnFilterSql = (filter: Filter<TestVirtualColumnEntity>): string => {
+      const repo = dataSource.getRepository(TestVirtualColumnEntity)
+      const [sql] = new FilterQueryBuilder<TestVirtualColumnEntity>(repo)
+        .applyFilter(repo.createQueryBuilder('TestVirtualColumnEntity'), filter, 'TestVirtualColumnEntity')
+        .getQueryAndParameters()
+
+      return sql.replace(/"/g, '')
+    }
+
+    it('should compare a root virtual column with its query', (): void => {
+      const sql = buildVirtualColumnFilterSql({ relationCount: { gt: 1 } })
+
+      expect(sql).toContain(
+        '((SELECT COUNT(*) FROM test_virtual_column_relation WHERE test_virtual_column_entity_id = TestVirtualColumnEntity.test_virtual_column_pk) > 1)'
+      )
+      expect(sql).not.toContain('TestVirtualColumnEntity.relationCount')
+    })
+
+    it('should compare a relation virtual column with its query aliased to the relation', (): void => {
+      const sql = buildVirtualColumnFilterSql({ virtualColumnRelations: { siblingCount: { gt: 1 } } })
+
+      expect(sql).toContain(
+        '((SELECT COUNT(*) FROM test_virtual_column_relation WHERE test_virtual_column_entity_id = virtualColumnRelations.test_virtual_column_entity_id) > 1)'
+      )
+      expect(sql).not.toContain('virtualColumnRelations.siblingCount')
     })
   })
 })
