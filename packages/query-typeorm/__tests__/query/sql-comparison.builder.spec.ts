@@ -1,4 +1,5 @@
 import { CommonFieldComparisonBetweenType } from '@ptc-org/nestjs-query-core'
+import { Repository } from 'typeorm'
 
 import { randomString } from '../../src/common'
 import { SQLComparisonBuilder } from '../../src/query'
@@ -257,6 +258,50 @@ describe('SQLComparisonBuilder', (): void => {
       expect(() => createSQLComparisonBuilder().build('numberType', 'notBetween', between)).toThrow(
         'Invalid value for not between expected {lower: val, upper: val} got [1,10]'
       )
+    })
+  })
+
+  describe('match comparisons', () => {
+    const createSQLComparisonBuilderForDatabaseType = (databaseType: string) =>
+      new SQLComparisonBuilder<TestEntity>(SQLComparisonBuilder.DEFAULT_COMPARISON_MAP, {
+        metadata: { columns: [] },
+        manager: { connection: { options: { type: databaseType } } }
+      } as unknown as Repository<TestEntity>)
+
+    it.each(['postgres', 'aurora-postgres'])('should build a websearch tsquery fragment for %s', (databaseType): void => {
+      expect(
+        createSQLComparisonBuilderForDatabaseType(databaseType).build('stringType', 'match', 'foo bar', 'TestEntity')
+      ).toEqual({
+        sql: 'TestEntity.stringType @@ websearch_to_tsquery(:param0)',
+        params: { param0: 'foo bar' }
+      })
+    })
+
+    it.each(['mysql', 'mariadb', 'aurora-mysql'])('should build a MATCH AGAINST fragment for %s', (databaseType): void => {
+      expect(
+        createSQLComparisonBuilderForDatabaseType(databaseType).build('stringType', 'match', 'foo bar', 'TestEntity')
+      ).toEqual({
+        sql: 'MATCH (TestEntity.stringType) AGAINST (:param0 IN NATURAL LANGUAGE MODE)',
+        params: { param0: 'foo bar' }
+      })
+    })
+
+    it('should throw an error for an unsupported database type', (): void => {
+      expect(() => createSQLComparisonBuilderForDatabaseType('better-sqlite3').build('stringType', 'match', 'foo')).toThrow(
+        'unsupported match comparison, no full text search support for database type better-sqlite3'
+      )
+    })
+
+    it('should throw an error when the database type cannot be determined', (): void => {
+      expect(() => createSQLComparisonBuilder().build('stringType', 'match', 'foo')).toThrow(
+        'unable to build match comparison, no repository to determine the database type from'
+      )
+    })
+
+    it('should throw an error for a non string value', (): void => {
+      expect(() =>
+        createSQLComparisonBuilderForDatabaseType('postgres').build('stringType', 'match', 1 as unknown as string)
+      ).toThrow('Invalid value for match expected a string got 1')
     })
   })
 })

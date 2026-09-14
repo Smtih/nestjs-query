@@ -169,6 +169,10 @@ export class MikroOrmQueryService<DTO extends object, Entity extends object = DT
       return ['$not', { $ilike: v as string }]
     }
 
+    if (k === 'match') {
+      throw new Error('unsupported match comparison, no full text search support in the mikro-orm adapter')
+    }
+
     return [k, this.expandFilter(v as FilterComparisons<unknown>)]
   }
 

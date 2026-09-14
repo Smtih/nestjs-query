@@ -15,6 +15,7 @@ In addition to the normal field options you can also specify the following optio
 
 - `allowedComparisons` - An array of allowed comparisons. You can use this option to allow a subset of filter comparisons when querying through graphql.
   - This option is useful if the field is expensive to query on for certain operators, or your data source supports a limited set of comparisons.
+  - It is also the only way to enable the opt-in [`match` full text search comparison](#example---full-text-search-with-match).
 
 - `filterRequired` - When set to `true` the field will be required whenever a `filter` is used. The `filter` requirement applies to all `read`, `update`, and `delete` endpoints that use a `filter`.
 
@@ -87,6 +88,77 @@ export class TodoItemDTO {
   updated!: Date
 }
 ```
+
+### Example - full text search with match
+
+The `match` comparison performs a database-backed full text search. Unlike the other comparisons it is **never exposed by
+default**; a `String` field must explicitly list it in `allowedComparisons` to add it to the schema.
+
+todo-item.dto.ts
+
+```ts
+import { FilterableField, IDField } from '@ptc-org/nestjs-query-graphql'
+import { ObjectType, ID } from '@nestjs/graphql'
+
+@ObjectType('TodoItem')
+export class TodoItemDTO {
+
+  @IDField(() => ID)
+  id!: string
+
+  @FilterableField({ allowedComparisons: ['eq', 'iLike', 'match'] })
+  title!: string
+}
+```
+
+```graphql
+{
+  todoItems(filter: { title: { match: "shopping list" } }) {
+    # ...
+  }
+}
+```
+
+The comparison is executed by `@ptc-org/nestjs-query-typeorm` and translates to the database's full text search support.
+
+**MySQL/MariaDB** generates `MATCH (title) AGAINST (:query IN NATURAL LANGUAGE MODE)`, which requires a
+[`FULLTEXT` index](https://dev.mysql.com/doc/refman/8.4/en/fulltext-search.html) on the column:
+
+```ts
+@Entity()
+export class TodoItemEntity {
+  @Index({ fulltext: true })
+  @Column()
+  title!: string
+}
+```
+
+**PostgreSQL** generates `title @@ websearch_to_tsquery(:query)`. This is valid on any text column, but to make the search use a
+[GIN index](https://www.postgresql.org/docs/current/textsearch-tables.html) declare the filterable column as a stored generated
+`tsvector` column and filter on that field instead:
+
+```ts
+@Entity()
+export class TodoItemEntity {
+  @Column()
+  title!: string
+
+  @Index('todo_item_search_vector_idx', { synchronize: false })
+  @Column({
+    type: 'tsvector',
+    asExpression: "to_tsvector('english', title)",
+    generatedType: 'STORED',
+    select: false
+  })
+  searchVector!: string
+}
+```
+
+<Warning>
+  `match` is only supported by the TypeORM adapter on PostgreSQL and MySQL/MariaDB. Other databases (e.g. sqlite) and the other
+  adapters (sequelize, mongoose, typegoose, mikro-orm), as well as the in-memory filtering used by
+  [subscriptions](/graphql/subscriptions), reject the comparison with an error instead of silently returning wrong results.
+</Warning>
 
 ### Example - filterRequired[​](#example---filterrequired 'Direct link to Example - filterRequired')
 

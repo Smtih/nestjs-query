@@ -89,6 +89,12 @@ describe('MikroOrmQueryService', () => {
       expect(result).toHaveLength(2) // foo1 and foo10
     })
 
+    it('should reject the unsupported match operator', async () => {
+      await expect(queryService.query({ filter: { stringType: { match: 'foo' } } })).rejects.toThrow(
+        'unsupported match comparison, no full text search support in the mikro-orm adapter'
+      )
+    })
+
     it('should filter by is operator (null check)', async () => {
       const result = await queryService.query({ filter: { boolType: { is: true } } })
       expect(result).toHaveLength(5)

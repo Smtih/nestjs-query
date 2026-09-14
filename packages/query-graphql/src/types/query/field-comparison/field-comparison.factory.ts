@@ -11,12 +11,12 @@ import {
 } from '@nestjs/graphql'
 import { Class, FilterComparisonOperators, FilterFieldComparison, isNamed, upperCaseFirst } from '@ptc-org/nestjs-query-core'
 import { Type } from 'class-transformer'
-import { IsBoolean, IsDate, IsInt, IsNumber, IsOptional, ValidateNested } from 'class-validator'
+import { IsBoolean, IsDate, IsInt, IsNumber, IsOptional, IsString, ValidateNested } from 'class-validator'
 
 import { getGraphqlEnumMetadata } from '../../../common'
 import { composeDecorators, SkipIf } from '../../../decorators'
 import { IsUndefined } from '../../validators'
-import { isInAllowedList } from '../helpers'
+import { isExplicitlyInAllowedList, isInAllowedList } from '../helpers'
 import { getOrCreateBooleanFieldComparison } from './boolean-field-comparison.type'
 import { getOrCreateDateFieldComparison } from './date-field-comparison.type'
 import { getOrCreateFloatFieldComparison } from './float-field-comparison.type'
@@ -49,6 +49,7 @@ const knownTypes: Set<ReturnTypeFuncValue> = new Set([
 ])
 
 const allowedBetweenTypes: Set<ReturnTypeFuncValue> = new Set([Number, Int, Float, Date, GraphQLISODateTime, GraphQLTimestamp])
+const allowedMatchTypes: Set<ReturnTypeFuncValue> = new Set([String])
 const betweenFilterValidationMap: Map<ReturnTypeFuncValue, PropertyDecorator> = new Map()
 betweenFilterValidationMap.set(Number, IsNumber())
 betweenFilterValidationMap.set(Float, IsNumber())
@@ -111,6 +112,16 @@ export function createFilterComparisonType<T>(options: FilterComparisonOptions<T
 
   const isNotAllowed = (val: FilterComparisonOperators<unknown>, mustBeType?: Set<ReturnTypeFuncValue>) => () => {
     const comparisonAllowed = isInAllowedList(options.allowedComparisons, val as unknown)
+
+    if (comparisonAllowed) {
+      return mustBeType && !mustBeType.has(fieldType)
+    }
+
+    return true
+  }
+
+  const isNotExplicitlyAllowed = (val: FilterComparisonOperators<unknown>, mustBeType?: Set<ReturnTypeFuncValue>) => () => {
+    const comparisonAllowed = isExplicitlyInAllowedList(options.allowedComparisons, val as unknown)
 
     if (comparisonAllowed) {
       return mustBeType && !mustBeType.has(fieldType)
@@ -202,7 +213,13 @@ export function createFilterComparisonType<T>(options: FilterComparisonOptions<T
     @IsUndefined()
     @Type(() => FieldType)
     @CustomDecorator()
-    notILike?: T;
+    notILike?: T
+
+    @SkipIf(isNotExplicitlyAllowed('match', allowedMatchTypes), Field(() => String, { nullable: true }))
+    @IsUndefined()
+    @IsString()
+    @CustomDecorator()
+    match?: string;
 
     @SkipIf(isNotAllowed('in'), Field(() => [fieldType], { nullable: true }))
     @IsUndefined()

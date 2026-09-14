@@ -179,6 +179,19 @@ export interface StringFieldComparisons extends CommonFieldComparisonType<string
    * ```
    */
   notILike?: string
+  /**
+   * Full text search comparison backed by the database's full text index support.
+   *
+   * ```ts
+   * // MySQL: MATCH (field) AGAINST ('search terms' IN NATURAL LANGUAGE MODE)
+   * // PostgreSQL: field @@ websearch_to_tsquery('search terms')
+   * { field: { match: 'search terms' } }
+   * ```
+   *
+   * Only supported by `@ptc-org/nestjs-query-typeorm` on PostgreSQL and MySQL/MariaDB;
+   * all other adapters reject the comparison with an error.
+   */
+  match?: string
 }
 
 type BuiltInTypes = boolean | string | number | Date | RegExp | bigint | symbol | null | undefined

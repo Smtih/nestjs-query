@@ -343,3 +343,19 @@ All types support the following comparisons.
     }
   }
   ```
+- `match` - field matches a full text search query.
+  ```ts
+  // MySQL/MariaDB: MATCH (title) AGAINST ('shopping list' IN NATURAL LANGUAGE MODE)
+  // PostgreSQL:    title @@ websearch_to_tsquery('shopping list')
+  {
+    title: {
+      match: 'shopping list'
+    }
+  }
+  ```
+
+<Note>
+  The `match` comparison is not exposed in the GraphQL schema by default. Enable it per field with
+  [`allowedComparisons`](/graphql/dtos#example---full-text-search-with-match). It is only supported by
+  `@ptc-org/nestjs-query-typeorm` on PostgreSQL and MySQL/MariaDB - every other adapter and database rejects it with an error.
+</Note>

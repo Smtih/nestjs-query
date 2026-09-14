@@ -273,6 +273,36 @@ describe('filter types', (): void => {
         const schema = await generateSchema([FilterBetweenTypeSpec])
         expect(schema).toMatchSnapshot()
       })
+
+      it('should only expose the match comparison when explicitly allowed on a string field', async () => {
+        @ObjectType('TestMatchComparison')
+        class TestMatchComparisonsDto extends BaseType {
+          @FilterableField({ allowedComparisons: ['like', 'match'] })
+          stringField!: string
+
+          @FilterableField(() => Int, { allowedComparisons: ['eq', 'match'] })
+          intField!: number
+        }
+
+        const TestGraphQLMatchComparisonFilter: Class<Filter<TestMatchComparisonsDto>> = FilterType(TestMatchComparisonsDto)
+
+        @InputType()
+        class TestMatchComparisonDtoFilter extends TestGraphQLMatchComparisonFilter {}
+
+        @Resolver()
+        class FilterMatchTypeSpec {
+          @Query(() => Int)
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          test(@Args('input') input: TestMatchComparisonDtoFilter): number {
+            return 1
+          }
+        }
+
+        const schema = await generateSchema([FilterMatchTypeSpec])
+        expect(schema).toContain('match: String')
+        expect(schema.match(/match: String/g)).toHaveLength(1)
+        expect(schema).toMatchSnapshot()
+      })
     })
 
     describe('filterDecorators option', () => {

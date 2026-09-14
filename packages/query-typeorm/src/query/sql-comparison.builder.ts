@@ -37,6 +37,10 @@ export class SQLComparisonBuilder<Entity> {
     notilike: 'NOT ILIKE'
   }
 
+  private static readonly WEBSEARCH_TO_TSQUERY_DATABASE_TYPES: Set<string> = new Set(['postgres', 'aurora-postgres'])
+
+  private static readonly MATCH_AGAINST_DATABASE_TYPES: Set<string> = new Set(['mysql', 'mariadb', 'aurora-mysql'])
+
   constructor(
     readonly comparisonMap: Record<string, string> = SQLComparisonBuilder.DEFAULT_COMPARISON_MAP,
     readonly repo?: Repository<Entity>
@@ -89,6 +93,9 @@ export class SQLComparisonBuilder<Entity> {
     if (normalizedCmp === 'notbetween') {
       // notBetween comparison (field NOT BETWEEN x AND y)
       return this.notBetweenComparisonSQL(col, val)
+    }
+    if (normalizedCmp === 'match') {
+      return this.matchComparisonSQL(col, val)
     }
     throw new Error(`unknown operator ${JSON.stringify(cmp)}`)
   }
@@ -190,6 +197,29 @@ export class SQLComparisonBuilder<Entity> {
     val: EntityComparisonField<Entity, F>
   ): val is CommonFieldComparisonBetweenType<Entity[F]> {
     return val !== null && typeof val === 'object' && 'lower' in val && 'upper' in val
+  }
+
+  private matchComparisonSQL<F extends keyof Entity>(col: string, val: EntityComparisonField<Entity, F>): CmpSQLType {
+    if (typeof val !== 'string') {
+      throw new Error(`Invalid value for match expected a string got ${JSON.stringify(val)}`)
+    }
+    const databaseType = this.getDatabaseType()
+    const { paramName } = this
+    const params = { [paramName]: val }
+    if (SQLComparisonBuilder.WEBSEARCH_TO_TSQUERY_DATABASE_TYPES.has(databaseType)) {
+      return { sql: `${col} @@ websearch_to_tsquery(:${paramName})`, params }
+    }
+    if (SQLComparisonBuilder.MATCH_AGAINST_DATABASE_TYPES.has(databaseType)) {
+      return { sql: `MATCH (${col}) AGAINST (:${paramName} IN NATURAL LANGUAGE MODE)`, params }
+    }
+    throw new Error(`unsupported match comparison, no full text search support for database type ${databaseType}`)
+  }
+
+  private getDatabaseType(): string {
+    if (!this.repo) {
+      throw new Error('unable to build match comparison, no repository to determine the database type from')
+    }
+    return this.repo.manager.connection.options.type
   }
 
   private getCol(field: string, alias?: string): string {

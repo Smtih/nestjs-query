@@ -12,6 +12,10 @@ describe('ComparisonBuilder', (): void => {
     expect(() => createComparisonBuilder().build('stringType', 'bad', 'foo')).toThrow('unknown operator "bad"')
   })
 
+  it('should throw an error for the unsupported match comparison', () => {
+    expect(() => createComparisonBuilder().build('stringType', 'match', 'foo')).toThrow('unknown operator "match"')
+  })
+
   describe('eq comparisons', () => {
     it('should build an unqualified eq sql fragment', (): void => {
       expect(createComparisonBuilder().build('stringType', 'eq', 'foo')).toEqual({

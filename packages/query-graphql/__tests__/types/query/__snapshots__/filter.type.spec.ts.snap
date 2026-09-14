@@ -708,6 +708,95 @@ input TestBetweenComparisonStringFieldFilterComparison {
 }"
 `;
 
+exports[`filter types FilterType allowedComparisons option should only expose the match comparison when explicitly allowed on a string field 1`] = `
+"type TestFilterDto {
+  id: Float!
+  boolField: Boolean!
+  dateField: DateTime!
+  floatField: Float!
+  intField: Int!
+  numberField: Float!
+  stringField: String!
+  stringEnumField: StringEnum!
+  numberEnumField: NumberEnum!
+  timestampField: Timestamp!
+  nonFilterField: Float!
+}
+
+"""
+A date-time string at UTC, such as 2019-12-03T09:54:33Z, compliant with the date-time format.
+"""
+scalar DateTime
+
+enum StringEnum {
+  ONE_STR
+  TWO_STR
+  THREE_STR
+  FOUR_STR
+}
+
+enum NumberEnum {
+  ONE
+  TWO
+  THREE
+  FOUR
+}
+
+"""
+\`Date\` type as integer. Type represents date and time as number of milliseconds from start of UNIX epoch.
+"""
+scalar Timestamp
+
+type Query {
+  test(input: TestMatchComparisonDtoFilter!): Int!
+}
+
+input TestMatchComparisonDtoFilter {
+  and: [TestMatchComparisonFilter!]
+  or: [TestMatchComparisonFilter!]
+  id: NumberFieldComparison
+  stringField: TestMatchComparisonStringFieldFilterComparison
+  intField: TestMatchComparisonIntFieldFilterComparison
+}
+
+input TestMatchComparisonFilter {
+  and: [TestMatchComparisonFilter!]
+  or: [TestMatchComparisonFilter!]
+  id: NumberFieldComparison
+  stringField: TestMatchComparisonStringFieldFilterComparison
+  intField: TestMatchComparisonIntFieldFilterComparison
+}
+
+input NumberFieldComparison {
+  is: Boolean
+  isNot: Boolean
+  eq: Float
+  neq: Float
+  gt: Float
+  gte: Float
+  lt: Float
+  lte: Float
+  in: [Float!]
+  notIn: [Float!]
+  between: NumberFieldComparisonBetween
+  notBetween: NumberFieldComparisonBetween
+}
+
+input NumberFieldComparisonBetween {
+  lower: Float!
+  upper: Float!
+}
+
+input TestMatchComparisonStringFieldFilterComparison {
+  like: String
+  match: String
+}
+
+input TestMatchComparisonIntFieldFilterComparison {
+  eq: Int
+}"
+`;
+
 exports[`filter types FilterType filterDecorators option should apply the decorator to the correct fields 1`] = `
 [
   {
@@ -748,6 +837,10 @@ exports[`filter types FilterType filterDecorators option should apply the decora
   },
   {
     "propertyKey": "notILike",
+    "target": Fc {},
+  },
+  {
+    "propertyKey": "match",
     "target": Fc {},
   },
   {
@@ -796,6 +889,10 @@ exports[`filter types FilterType filterDecorators option should apply the decora
   },
   {
     "propertyKey": "notILike",
+    "target": Fc {},
+  },
+  {
+    "propertyKey": "match",
     "target": Fc {},
   },
   {
