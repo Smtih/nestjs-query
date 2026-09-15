@@ -4,6 +4,26 @@ import { Filter, FilterComparisons, FilterFieldComparison } from '../interfaces'
 import { FilterBuilder } from './filter.builder'
 import { QueryFieldMap } from './query.helpers'
 
+/**
+ * The reserved filter key that holds a relation's `JOIN ... ON` conditions.
+ *
+ * It is not a field or relation name and is therefore skipped when collecting the fields a filter
+ * references.
+ */
+export const ON_CONDITION_KEY = 'on'
+
+/**
+ * Thrown when a filter carries `on` join conditions but the query adapter executing it has no way
+ * to honour them.
+ */
+export class JoinConditionsNotSupportedError extends Error {
+  constructor(adapter: string) {
+    super(`\`${ON_CONDITION_KEY}\` join conditions in a filter are not supported by ${adapter}.`)
+
+    this.name = 'JoinConditionsNotSupportedError'
+  }
+}
+
 export type LikeComparisonOperators = 'like' | 'notLike' | 'iLike' | 'notILike'
 export type InComparisonOperators = 'in' | 'notIn'
 export type BetweenComparisonOperators = 'between' | 'notBetween'
@@ -40,6 +60,36 @@ export const isComparison = <DTO, K extends keyof DTO>(
       isRangeComparisonOperators(op) ||
       isBooleanComparisonOperators(op)
   )
+}
+
+const isFilterLike = (value: unknown): value is Record<string, unknown> =>
+  !!value && typeof value === 'object' && !Array.isArray(value)
+
+/**
+ * Asserts that a filter carries no `on` join conditions anywhere in its tree.
+ *
+ * Query adapters that cannot inject conditions into a relation's join call this at their filter
+ * entry point to fail loudly instead of silently returning a broader result.
+ *
+ * @param filter - the filter to inspect.
+ * @param adapter - the adapter named in the error when join conditions are found.
+ */
+export const assertFilterHasNoJoinConditions = (filter: unknown, adapter: string): void => {
+  if (!isFilterLike(filter)) {
+    return
+  }
+
+  if (ON_CONDITION_KEY in filter) {
+    throw new JoinConditionsNotSupportedError(adapter)
+  }
+
+  for (const value of Object.values(filter)) {
+    if (Array.isArray(value)) {
+      value.forEach((subFilter) => assertFilterHasNoJoinConditions(subFilter, adapter))
+    } else if (isFilterLike(value) && !isComparison<{ field: unknown }, 'field'>(value as FilterFieldComparison<unknown>)) {
+      assertFilterHasNoJoinConditions(value, adapter)
+    }
+  }
 }
 
 // TODO: test
@@ -100,7 +150,7 @@ export const getFilterFields = <DTO>(filter: Filter<DTO>): string[] => {
           fields
         )
       }
-    } else {
+    } else if (filterField !== ON_CONDITION_KEY) {
       fields.add(filterField)
     }
 

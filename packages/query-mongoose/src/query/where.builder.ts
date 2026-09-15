@@ -1,4 +1,4 @@
-import { Filter, FilterComparisons, FilterFieldComparison } from '@ptc-org/nestjs-query-core'
+import { assertFilterHasNoJoinConditions, Filter, FilterComparisons, FilterFieldComparison } from '@ptc-org/nestjs-query-core'
 import { Document, Model as MongooseModel, QueryFilter } from 'mongoose'
 
 import { ComparisonBuilder, EntityComparisonField } from './comparison.builder'
@@ -18,6 +18,8 @@ export class WhereBuilder<Entity extends Document> {
    * @param filter - the filter to build the WHERE clause from.
    */
   build(filter: Filter<Entity>): QueryFilter<Entity> {
+    assertFilterHasNoJoinConditions(filter, '@ptc-org/nestjs-query-mongoose')
+
     const normalizedFilter = this.getNormalizedFilter(filter)
     const { and, or } = normalizedFilter
     let ands: QueryFilter<Entity>[] = []

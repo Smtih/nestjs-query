@@ -389,5 +389,13 @@ describe('MikroOrmQueryService', () => {
         })
       ).rejects.toThrow('filter must contain either only `and` or `or` property, or other properties')
     })
+
+    it('should throw when a filter contains join conditions', async () => {
+      await expect(
+        queryService.query({
+          filter: { testRelations: { on: { relationName: { eq: 'foo' } } } } as never
+        })
+      ).rejects.toThrow('`on` join conditions in a filter are not supported by @ptc-org/nestjs-query-mikro-orm.')
+    })
   })
 })

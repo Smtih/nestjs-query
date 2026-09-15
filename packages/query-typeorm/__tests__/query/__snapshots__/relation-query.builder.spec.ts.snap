@@ -31,6 +31,22 @@ WHERE
   AND "testEntity"."test_entity_pk" IN (test-entity-1)"
 `;
 
+exports[`RelationQueryBuilder #batchSelect with join conditions should add the join conditions of the relation filter to the JOIN ON clause 1`] = `
+"SELECT DISTINCT
+  "testRelations"."test_relation_pk" AS "testRelations_test_relation_pk",
+  "testRelations"."relation_name" AS "testRelations_relation_name",
+  "testRelations"."test_entity_id" AS "testRelations_test_entity_id",
+  "testRelations"."uni_directional_test_entity_id" AS "testRelations_uni_directional_test_entity_id",
+  "testRelations"."uni_directional_relation_test_entity_id" AS "testRelations_uni_directional_relation_test_entity_id"
+FROM
+  "test_relation" "testRelations"
+  LEFT JOIN "relation_of_test_relation_entity" "relationOfTestRelation" ON "relationOfTestRelation"."test_relation_pk" = "testRelations"."uni_directional_relation_test_entity_id"
+  AND ("relationOfTestRelation"."relation_name" = foo)
+WHERE
+  1 = 1
+  AND "testRelations"."test_entity_id" IN (test-entity-id-1, test-entity-id-2)"
+`;
+
 exports[`RelationQueryBuilder #select many to many many-to-many custom join table should work with a many-to-many through a join table 1`] = `
 "SELECT
   "testEntityRelation"."test_relation_id" AS "testEntityRelation_test_relation_id",
@@ -193,6 +209,24 @@ WHERE
     "testRelations"."test_entity_id" = test-entity-id-1
   )
   AND ("testRelations"."relation_name" = foo)"
+`;
+
+exports[`RelationQueryBuilder #select with join conditions should add the join conditions of the relation filter to the JOIN ON clause 1`] = `
+"SELECT
+  "testRelations"."test_relation_pk" AS "testRelations_test_relation_pk",
+  "testRelations"."relation_name" AS "testRelations_relation_name",
+  "testRelations"."test_entity_id" AS "testRelations_test_entity_id",
+  "testRelations"."uni_directional_test_entity_id" AS "testRelations_uni_directional_test_entity_id",
+  "testRelations"."uni_directional_relation_test_entity_id" AS "testRelations_uni_directional_relation_test_entity_id"
+FROM
+  "test_relation" "testRelations"
+  LEFT JOIN "relation_of_test_relation_entity" "relationOfTestRelation" ON "relationOfTestRelation"."test_relation_pk" = "testRelations"."uni_directional_relation_test_entity_id"
+  AND ("relationOfTestRelation"."relation_name" = foo)
+WHERE
+  (
+    "testRelations"."test_entity_id" = test-entity-id-1
+  )
+  AND 1 = 1"
 `;
 
 exports[`RelationQueryBuilder #select with paging should apply paging args going backward 1`] = `

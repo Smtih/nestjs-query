@@ -16,6 +16,14 @@ describe('WhereBuilder', (): void => {
     expectWhereQuery({}, {})
   })
 
+  it('should throw when a filter contains join conditions', (): void => {
+    const filter = { testRelation: { on: { stringType: { eq: 'foo' } } } } as unknown as Filter<TestEntity>
+
+    expect(() => createWhereBuilder().build(filter, new Map())).toThrow(
+      '`on` join conditions in a filter are not supported by @ptc-org/nestjs-query-sequelize.'
+    )
+  })
+
   it('or multiple operators for a single field together', (): void => {
     expectWhereQuery(
       {

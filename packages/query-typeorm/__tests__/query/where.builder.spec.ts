@@ -44,6 +44,28 @@ describe('WhereBuilder', (): void => {
     expectSQLSnapshot({ numberType: { eq: 1 }, stringType: { like: 'foo%' }, boolType: { is: true } })
   })
 
+  describe('join conditions', (): void => {
+    const expectRelationSQLSnapshot = (filter: Filter<TestEntity>): void => {
+      const relationNames = {
+        testRelations: { alias: 'testRelations', metadata: dataSource.getMetadata(TestRelation), relations: {} }
+      }
+      const selectQueryBuilder = createWhereBuilder().build(getQueryBuilder(), filter, relationNames, 'TestEntity')
+      const [sql, params] = selectQueryBuilder.getQueryAndParameters()
+
+      expect(formatSql(sql, { params })).toMatchSnapshot()
+    }
+
+    it('should not add join conditions to the where clause', (): void => {
+      expectSQLSnapshot({ on: { numberType: { eq: 1 } }, stringType: { eq: 'foo' } })
+    })
+
+    it('should not add a relations join conditions to the where clause', (): void => {
+      expectRelationSQLSnapshot({
+        testRelations: { on: { relationName: { eq: 'bar' } }, testRelationPk: { eq: 'foo' } }
+      })
+    })
+  })
+
   describe('and', (): void => {
     it('and multiple expressions together', (): void => {
       expectSQLSnapshot({

@@ -25,6 +25,14 @@ describe('WhereBuilder', (): void => {
     expectFilter({}, {})
   })
 
+  it('should throw when a filter contains join conditions', (): void => {
+    const filter = { testReference: { on: { stringType: { eq: 'foo' } } } } as unknown as Filter<TestEntity>
+
+    expect(() => createWhereBuilder().build(filter)).toThrow(
+      '`on` join conditions in a filter are not supported by @ptc-org/nestjs-query-mongoose.'
+    )
+  })
+
   it('or multiple operators for a single field together', (): void => {
     expectFilter<TestEntity>(
       {

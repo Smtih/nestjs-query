@@ -1,4 +1,4 @@
-import { Filter, FilterComparisons, FilterFieldComparison } from '@ptc-org/nestjs-query-core'
+import { assertFilterHasNoJoinConditions, Filter, FilterComparisons, FilterFieldComparison } from '@ptc-org/nestjs-query-core'
 import { Association, Op, WhereOptions } from 'sequelize'
 
 import { EntityComparisonField, SQLComparisonBuilder } from './sql-comparison.builder'
@@ -16,6 +16,8 @@ export class WhereBuilder<Entity> {
    * @param associations - map of associations that are included in the query.
    */
   build(filter: Filter<Entity>, associations: Map<string, Association>, alias?: string): WhereOptions {
+    assertFilterHasNoJoinConditions(filter, '@ptc-org/nestjs-query-sequelize')
+
     const { and, or } = filter
     let ands: WhereOptions[] = []
     let ors: WhereOptions[] = []

@@ -1,5 +1,7 @@
 export * from './aggregate.builder'
 export * from './filter-query.builder'
+export * from './on-condition.builder'
+export * from './on-condition.validator'
 export * from './relation-query.builder'
 export * from './sql-comparison.builder'
 export * from './where.builder'

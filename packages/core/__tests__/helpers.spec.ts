@@ -5,12 +5,14 @@ import {
   applyPaging,
   applyQuery,
   applySort,
+  assertFilterHasNoJoinConditions,
   ensureMatchesCreationFilter,
   Filter,
   filterCreatableRecords,
   getFilterComparisons,
   getFilterFields,
   getFilterOmitting,
+  JoinConditionsNotSupportedError,
   mergeFilter,
   mergeFilters,
   Paging,
@@ -193,6 +195,15 @@ describe('applyFilter', () => {
     }
     expect(applyFilter({ first: 'foo', last: 'bar' }, filter)).toBe(true)
     expect(applyFilter({ first: 'bar', last: 'foo' }, filter)).toBe(false)
+  })
+
+  it('should ignore join conditions, which have no in memory equivalent', () => {
+    const filter: Filter<TestDTO> = {
+      on: { first: { eq: 'never-matches' } },
+      last: { eq: 'bar' }
+    }
+    expect(applyFilter({ first: 'foo', last: 'bar' }, filter)).toBe(true)
+    expect(applyFilter({ first: 'foo', last: 'foo' }, filter)).toBe(false)
   })
 
   it('should handle neq comparisons', () => {
@@ -707,6 +718,65 @@ describe('getFilterFields', () => {
       }
     }
     expect(getFilterFields(filter).sort()).toEqual(['boolField', 'strField', 'testRelation'])
+  })
+
+  it('should not treat join conditions as a field', () => {
+    const filter: Filter<Test> = {
+      strField: { eq: '' },
+      testRelation: {
+        on: { boolField: { is: false } }
+      }
+    }
+    expect(getFilterFields(filter).sort()).toEqual(['strField', 'testRelation'])
+    expect(getFilterFields(filter.testRelation as Filter<Test>)).toEqual([])
+  })
+})
+
+describe('assertFilterHasNoJoinConditions', () => {
+  class Test {
+    strField!: string
+
+    boolField!: boolean
+
+    testRelation!: Test
+  }
+
+  const assertNoJoinConditions = (filter: Filter<Test>) => () => assertFilterHasNoJoinConditions(filter, 'TestAdapter')
+
+  it('should accept a filter without join conditions', () => {
+    expect(
+      assertNoJoinConditions({
+        strField: { eq: 'foo' },
+        and: [{ boolField: { is: true } }],
+        or: [{ testRelation: { strField: { like: '%bar%' } } }]
+      })
+    ).not.toThrow()
+  })
+
+  it('should accept comparison values that are objects', () => {
+    expect(assertNoJoinConditions({ strField: { between: { lower: 'a', upper: 'z' } } })).not.toThrow()
+  })
+
+  it('should throw a descriptive error for join conditions on a relation filter', () => {
+    expect(assertNoJoinConditions({ testRelation: { on: { boolField: { is: false } } } })).toThrow(
+      '`on` join conditions in a filter are not supported by TestAdapter.'
+    )
+  })
+
+  it('should throw for join conditions at the root filter level', () => {
+    expect(assertNoJoinConditions({ on: { strField: { eq: 'foo' } } })).toThrow(JoinConditionsNotSupportedError)
+  })
+
+  it('should throw for join conditions nested inside a boolean expression', () => {
+    expect(assertNoJoinConditions({ and: [{ or: [{ testRelation: { on: { boolField: { is: false } } } }] }] })).toThrow(
+      JoinConditionsNotSupportedError
+    )
+  })
+
+  it('should throw for join conditions on a deeply nested relation filter', () => {
+    expect(assertNoJoinConditions({ testRelation: { testRelation: { on: { boolField: { is: false } } } } })).toThrow(
+      JoinConditionsNotSupportedError
+    )
   })
 })
 

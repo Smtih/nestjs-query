@@ -123,6 +123,22 @@ describe('RelationQueryBuilder', (): void => {
       })
     })
 
+    describe('with join conditions', () => {
+      it('should add the join conditions of the relation filter to the JOIN ON clause', () => {
+        const query: Query<TestRelation> = {
+          filter: { relationOfTestRelation: { on: { relationName: { eq: 'foo' } } } }
+        }
+        expectSQLSnapshot(TestEntity, testEntity, 'testRelations', query)
+      })
+
+      it('should throw when join conditions are at the root of the relation query filter', () => {
+        const query: Query<TestRelation> = { filter: { on: { relationName: { eq: 'foo' } } } }
+        expect(() => expectSQLSnapshot(TestEntity, testEntity, 'testRelations', query)).toThrow(
+          '`on` conditions are only supported at the top level of a relation filter, not at the root filter level.'
+        )
+      })
+    })
+
     describe('with paging', () => {
       it('should apply paging args going forward', () => {
         expectSQLSnapshot(TestEntity, testEntity, 'testRelations', { paging: { limit: 10, offset: 11 } })
@@ -211,6 +227,15 @@ describe('RelationQueryBuilder', (): void => {
     describe('many to one', () => {
       it('should query with with multiple entities', () => {
         expectBatchSQLSnapshot(TestEntity, testEntities, 'manyToOneRelation', {})
+      })
+    })
+
+    describe('with join conditions', () => {
+      it('should add the join conditions of the relation filter to the JOIN ON clause', () => {
+        const query: Query<TestRelation> = {
+          filter: { relationOfTestRelation: { on: { relationName: { eq: 'foo' } } } }
+        }
+        expectBatchSQLSnapshot(TestEntity, testEntities, 'testRelations', query)
       })
     })
   })
