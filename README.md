@@ -68,3 +68,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the complete development and pull-req
 ## Collaboration
 
 If you have questions or [issues](https://github.com/TriPSs/nestjs-query/issues), please [open an issue](https://github.com/TriPSs/nestjs-query/issues/new). For community discussion, join the [NestJS Query Slack](https://join.slack.com/t/nestjsquery/shared_invite/zt-27dvu0tye-tOcAmeQ0PRSCEInW6P3h9g).
+
