@@ -9,6 +9,7 @@ import { Alias } from 'typeorm/query-builder/Alias'
 
 import { AggregateBuilder } from './aggregate.builder'
 import { FilterQueryBuilder } from './filter-query.builder'
+import { assertNoConditionsWithoutAJoin } from './join-condition'
 
 interface JoinCondition {
   leftHand: string
@@ -172,6 +173,8 @@ export class RelationQueryBuilder<Entity, Relation> {
     query: Query<Relation>,
     aggregateQuery: AggregateQuery<Relation>
   ): SelectQueryBuilder<Relation> {
+    assertNoConditionsWithoutAJoin(query.filter, 'an aggregate over a relation')
+
     let relationBuilder = this.createRelationQueryBuilder(entity)
     relationBuilder = this.filterQueryBuilder.applyAggregate(relationBuilder, aggregateQuery, relationBuilder.alias)
     relationBuilder = this.filterQueryBuilder.applyFilter(relationBuilder, query.filter, relationBuilder.alias)

@@ -51,7 +51,15 @@ export function relationJoinCondition<Relation>(conditions: Filter<Relation>): R
  */
 export class UnsupportedRelationJoinConditionError extends Error {}
 
-function filterHasRelationJoinCondition(filter?: Filter<unknown>): boolean {
+/**
+ * Whether a filter carries relation join conditions anywhere within it.
+ *
+ * Read by a query service that has to answer for a key it cannot honour where it is, so that it can
+ * say so in its own words rather than dropping the conditions from the query.
+ *
+ * @param filter - the filter to check.
+ */
+export function hasRelationJoinConditions(filter?: Filter<unknown>): boolean {
   if (!filter || typeof filter !== 'object') {
     return false
   }
@@ -62,10 +70,10 @@ function filterHasRelationJoinCondition(filter?: Filter<unknown>): boolean {
     }
 
     if (Array.isArray(value)) {
-      return value.some((branch) => filterHasRelationJoinCondition(branch as Filter<unknown>))
+      return value.some((branch) => hasRelationJoinConditions(branch as Filter<unknown>))
     }
 
-    return filterHasRelationJoinCondition(value as Filter<unknown>)
+    return hasRelationJoinConditions(value as Filter<unknown>)
   })
 }
 
@@ -79,7 +87,7 @@ function filterHasRelationJoinCondition(filter?: Filter<unknown>): boolean {
  * @param filter - the filter to check.
  */
 export function assertNoRelationJoinConditions(filter?: Filter<unknown>): void {
-  if (!filterHasRelationJoinCondition(filter)) {
+  if (!hasRelationJoinConditions(filter)) {
     return
   }
 

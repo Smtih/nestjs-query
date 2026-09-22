@@ -26,6 +26,7 @@ import { SoftDeleteQueryBuilder } from 'typeorm/query-builder/SoftDeleteQueryBui
 import { AggregateBuilder } from './aggregate.builder'
 import { deriveBuilder } from './derive-builder'
 import {
+  assertNoConditionsWithoutAJoin,
   EMPTY_JOIN_CONDITION,
   getJoinConditionFilter,
   isFilter,
@@ -192,6 +193,8 @@ export class FilterQueryBuilder<Entity> {
    * @param query - the query to apply.
    */
   public delete(query: Query<Entity>): DeleteQueryBuilder<Entity> {
+    assertNoConditionsWithoutAJoin(query.filter, 'a DELETE statement')
+
     return this.applyFilter(this.repo.createQueryBuilder().delete(), query.filter)
   }
 
@@ -201,6 +204,8 @@ export class FilterQueryBuilder<Entity> {
    * @param query - the query to apply.
    */
   public softDelete(query: Query<Entity>): SoftDeleteQueryBuilder<Entity> {
+    assertNoConditionsWithoutAJoin(query.filter, 'a soft delete statement')
+
     return this.applyFilter(this.repo.createQueryBuilder().softDelete() as SoftDeleteQueryBuilder<Entity>, query.filter)
   }
 
@@ -210,6 +215,8 @@ export class FilterQueryBuilder<Entity> {
    * @param query - the query to apply.
    */
   public update(query: Query<Entity>): UpdateQueryBuilder<Entity> {
+    assertNoConditionsWithoutAJoin(query.filter, 'an UPDATE statement')
+
     const qb = this.applyFilter(this.repo.createQueryBuilder().update(), query.filter)
     return this.applySorting(qb, query.sorting)
   }

@@ -1,4 +1,10 @@
-import { Filter, RELATION_JOIN_CONDITION_KEY, RelationJoinConditionScope } from '@ptc-org/nestjs-query-core'
+import {
+  Filter,
+  hasRelationJoinConditions,
+  InvalidRelationJoinConditionError,
+  RELATION_JOIN_CONDITION_KEY,
+  RelationJoinConditionScope
+} from '@ptc-org/nestjs-query-core'
 import { EntityMetadata, ObjectLiteral } from 'typeorm'
 
 /**
@@ -96,4 +102,28 @@ export function combineJoinConditions(conditions: JoinCondition[], operator: ' A
   }
 
   return { condition: `(${present.map(({ condition }) => condition).join(operator)})`, params }
+}
+
+/**
+ * @internal
+ *
+ * Fails when a filter carries relation join conditions and the query being built joins no relation,
+ * so that conditions there is no ON clause to add them to are refused rather than dropped.
+ *
+ * A relation filter that only carries join conditions adds nothing to a WHERE clause, so a query
+ * built without the JOIN the conditions belong to would otherwise run as though the relation had
+ * never been filtered.
+ *
+ * @param filter - the filter of the query being built.
+ * @param query - what is being built, named in the error.
+ */
+export function assertNoConditionsWithoutAJoin(filter: Filter<unknown> | undefined, query: string): void {
+  if (!hasRelationJoinConditions(filter)) {
+    return
+  }
+
+  throw new InvalidRelationJoinConditionError(
+    `"${RELATION_JOIN_CONDITION_KEY}" conditions cannot be built into ${query}, which joins no relation. ` +
+      'Conditions that no ON clause could be given are refused rather than dropped from the query.'
+  )
 }

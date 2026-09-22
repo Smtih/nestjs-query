@@ -7,7 +7,7 @@ import {
 } from '@ptc-org/nestjs-query-core'
 import { DataSource, ObjectLiteral } from 'typeorm'
 
-import { FilterQueryBuilder, NestedRelationsAliased } from '../../src/query'
+import { FilterQueryBuilder, NestedRelationsAliased, RelationQueryBuilder } from '../../src/query'
 import { createTestConnection } from '../__fixtures__/connection.fixture'
 import { TestEntity } from '../__fixtures__/test.entity'
 import { TestRelation } from '../__fixtures__/test-relation.entity'
@@ -339,5 +339,46 @@ describe('relation join conditions in the filter of a selected relation', (): vo
           'Write the conditions in one of them, or filter the relation through a single filter.'
       )
     )
+  })
+})
+
+describe('relation join conditions in a query that joins nothing', (): void => {
+  let dataSource: DataSource
+
+  beforeEach(async () => {
+    dataSource = await createTestConnection()
+  })
+
+  afterEach(() => dataSource.destroy())
+
+  const filter = { testRelations: relationJoinCondition<TestRelation>({ relationName: { eq: 'a' } }) }
+
+  const getFilterQueryBuilder = () => new FilterQueryBuilder<TestEntity>(dataSource.getRepository(TestEntity))
+
+  it('should fail rather than delete every row when a delete filter carries them', () => {
+    expect(() => getFilterQueryBuilder().delete({ filter })).toThrow(InvalidRelationJoinConditionError)
+  })
+
+  it('should fail rather than update every row when an update filter carries them', () => {
+    expect(() => getFilterQueryBuilder().update({ filter })).toThrow(InvalidRelationJoinConditionError)
+  })
+
+  it('should fail rather than soft delete every row when a soft delete filter carries them', () => {
+    expect(() => getFilterQueryBuilder().softDelete({ filter })).toThrow(InvalidRelationJoinConditionError)
+  })
+
+  it('should fail rather than aggregate over every row when the filter of a relation aggregate carries them', () => {
+    const relationQueryBuilder = new RelationQueryBuilder<TestEntity, TestRelation>(
+      dataSource.getRepository(TestEntity),
+      'testRelations'
+    )
+
+    expect(() =>
+      relationQueryBuilder.aggregate(
+        { testEntityPk: 'test-entity-1' } as TestEntity,
+        { filter: { testEntity: relationJoinCondition<TestEntity>({ stringType: { eq: 'a' } }) } },
+        { count: [{ field: 'testRelationPk', args: {} }] }
+      )
+    ).toThrow(InvalidRelationJoinConditionError)
   })
 })

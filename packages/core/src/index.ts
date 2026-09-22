@@ -28,6 +28,7 @@ export {
   getFilterComparisons,
   getFilterFields,
   getFilterOmitting,
+  hasRelationJoinConditions,
   InvalidRelationJoinConditionError,
   invertSort,
   mergeFilter,

@@ -171,11 +171,15 @@ query.
 
 - Not at the root of a filter. A filter of the records a query returns has no `JOIN` of its own.
 - Not inside an `and` or an `or`. A relation referenced from several branches is joined once for all
-  of them.
+  of them. A filter that reaches the query service through `mergeFilter` or `mergeFilters`, as an
+  authorizer's filter does, is wrapped in an `and` and so cannot carry the key.
 - Not nested inside another `joinOn`. An `ON` clause constrains the one relation being joined.
 - The conditions under `joinOn` can only compare fields of the relation being joined. A condition on
   a relation of that relation would need a `JOIN` of its own, which an `ON` clause has nowhere to
   put.
+- Not in the filter of a query that builds no `JOIN`. `restoreMany` and `aggregateRelations` filter
+  without joining, so they refuse the key. `deleteMany` and `updateMany` select the records to act on
+  before acting, and so honour it.
 
 A relation is joined once however many filters reference it, so a query whose own filter and whose
 selected relation filter both carry conditions for the same relation is refused for the same reason.
@@ -190,8 +194,8 @@ selected relation filter both carry conditions for the same relation is refused 
   `joinOn` is honoured by `@ptc-org/nestjs-query-typeorm`. The query services of the other
   persistence packages reject a filter carrying it with an `UnsupportedRelationJoinConditionError`,
   rather than reading `joinOn` as the name of a field and answering a different question. The key is
-  not exposed in the generated GraphQL schema, so it is written in server code - an authorizer
-  filter, a `queryService.query(...)` call, or a custom resolver.
+  not exposed in the generated GraphQL schema, so it is written in server code - a
+  `queryService.query(...)` call, or a custom resolver.
 </Note>
 
 ---

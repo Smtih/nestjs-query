@@ -13,6 +13,7 @@ export {
 export {
   assertNoRelationJoinConditions,
   assertValidRelationJoinConditionPlacement,
+  hasRelationJoinConditions,
   InvalidRelationJoinConditionError,
   RELATION_JOIN_CONDITION_KEY,
   relationJoinCondition,
