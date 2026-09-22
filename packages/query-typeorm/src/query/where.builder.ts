@@ -1,10 +1,17 @@
-import { Filter, FilterComparisons, FilterFieldComparison } from '@ptc-org/nestjs-query-core'
+import {
+  Filter,
+  FilterComparisonOperators,
+  FilterComparisons,
+  FilterFieldComparison,
+  RELATION_JOIN_CONDITION_KEY
+} from '@ptc-org/nestjs-query-core'
 import { Brackets, EntityMetadata } from 'typeorm'
 
 import type { WhereExpressionBuilder } from 'typeorm'
 
 import { deriveBuilder } from './derive-builder'
 import { NestedRelationsAliased } from './filter-query.builder'
+import { combineJoinConditions, hasWhereConditions, JoinCondition } from './join-condition'
 import { EntityComparisonField, SQLComparisonBuilder } from './sql-comparison.builder'
 
 /**
@@ -16,7 +23,8 @@ export class WhereBuilder<Entity> {
 
   /**
    * Creates a builder like this one bound to another entity's metadata, used when a query descends
-   * into a relation.
+   * into a relation, both to build that relation's WHERE clause and to build the conditions its
+   * filter adds to the relation's `JOIN ... ON` clause.
    *
    * The derived builder keeps the prototype and the own property descriptors of this builder, and
    * its comparison builder is derived for the same metadata, so a custom builder is neither
@@ -59,6 +67,25 @@ export class WhereBuilder<Entity> {
     }
 
     return this.filterFields(where, filter, relationNames, alias)
+  }
+
+  /**
+   * Builds the conditions a relation's filter adds to that relation's `JOIN ... ON` clause.
+   *
+   * The conditions are built by a where builder derived for the relation, so that they are built by
+   * the same comparison builder the WHERE clause of that relation would be built by, and so that a
+   * field resolves against the relation rather than against the entity it is joined to.
+   *
+   * @param filter - the conditions carried by the relation's filter.
+   * @param relationMetadata - metadata of the relation being joined.
+   * @param alias - the alias the relation is joined under.
+   */
+  public buildRelationJoinCondition<Relation>(
+    filter: Filter<Relation>,
+    relationMetadata: EntityMetadata,
+    alias: string
+  ): JoinCondition {
+    return this.deriveForEntityMetadata<Relation>(relationMetadata).buildJoinCondition(filter, alias)
   }
 
   /**
@@ -127,7 +154,7 @@ export class WhereBuilder<Entity> {
     alias: string | undefined
   ): Where {
     return Object.keys(filter).reduce((w, field) => {
-      if (field !== 'and' && field !== 'or') {
+      if (field !== 'and' && field !== 'or' && field !== RELATION_JOIN_CONDITION_KEY) {
         return this.withFilterComparison(
           where,
           field as keyof Entity,
@@ -170,12 +197,62 @@ export class WhereBuilder<Entity> {
     )
   }
 
+  /**
+   * Builds a filter into a single SQL predicate, rather than into a `typeorm` WHERE expression, so
+   * that it can be added to a JOIN's ON clause.
+   *
+   * @param filter - the filter to build the predicate from.
+   * @param alias - the alias the filtered entity is joined under.
+   */
+  private buildJoinCondition(filter: Filter<Entity>, alias: string): JoinCondition {
+    return combineJoinConditions(
+      Object.keys(filter).map((field) => this.joinConditionForField(filter, field, alias)),
+      ' AND '
+    )
+  }
+
+  private joinConditionForField(filter: Filter<Entity>, field: string, alias: string): JoinCondition {
+    if (field === 'and' || field === 'or') {
+      const branches = filter[field] ?? []
+
+      return combineJoinConditions(
+        branches.map((branch) => this.buildJoinCondition(branch, alias)),
+        field === 'and' ? ' AND ' : ' OR '
+      )
+    }
+
+    return this.comparisonJoinCondition(field as keyof Entity, this.getField(filter, field as keyof Entity), alias)
+  }
+
+  private comparisonJoinCondition<T extends keyof Entity>(
+    field: T,
+    cmp: FilterFieldComparison<Entity[T]>,
+    alias: string
+  ): JoinCondition {
+    const comparisons = Object.keys(cmp).map((cmpType) => {
+      const { sql, params } = this.sqlComparisonBuilder.build(
+        field,
+        cmpType as FilterComparisonOperators<Entity[T]>,
+        cmp[cmpType] as EntityComparisonField<Entity, T>,
+        alias
+      )
+
+      return { condition: sql, params }
+    })
+
+    return combineJoinConditions(comparisons, ' OR ')
+  }
+
   private withRelationFilter<T extends keyof Entity, Where extends WhereExpressionBuilder>(
     where: Where,
     field: T,
     cmp: Filter<Entity[T]>,
     relationNames: NestedRelationsAliased
   ): Where {
+    if (!hasWhereConditions(cmp)) {
+      return where
+    }
+
     return where.andWhere(
       new Brackets((qb) => {
         const nestedRelationAliased = relationNames[field as string]

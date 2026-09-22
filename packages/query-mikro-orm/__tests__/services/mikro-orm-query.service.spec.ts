@@ -1,6 +1,12 @@
 import { BetterSqliteDriver } from '@mikro-orm/better-sqlite'
 import { EntityRepository, MikroORM } from '@mikro-orm/core'
-import { SortDirection, SortNulls } from '@ptc-org/nestjs-query-core'
+import {
+  Filter,
+  relationJoinCondition,
+  SortDirection,
+  SortNulls,
+  UnsupportedRelationJoinConditionError
+} from '@ptc-org/nestjs-query-core'
 
 import { MikroOrmQueryService } from '../../src'
 import { createTestConnection, refresh, TEST_ENTITIES, TestEntity, TestRelation } from '../__fixtures__'
@@ -23,6 +29,16 @@ describe('MikroOrmQueryService', () => {
     const em = orm.em.fork()
     testEntityRepo = em.getRepository(TestEntity)
     queryService = new MikroOrmQueryService(testEntityRepo)
+  })
+
+  describe('relation join conditions', () => {
+    it('should reject a filter that carries them rather than reading the key as a field', async () => {
+      const filter = {
+        testRelations: relationJoinCondition<TestRelation>({ relationName: { eq: 'foo1-test-relation' } })
+      } as Filter<TestEntity>
+
+      await expect(queryService.query({ filter })).rejects.toThrow(UnsupportedRelationJoinConditionError)
+    })
   })
 
   describe('#query', () => {

@@ -21,22 +21,30 @@ export {
   applyPaging,
   applyQuery,
   applySort,
+  assertNoRelationJoinConditions,
+  assertValidRelationJoinConditionPlacement,
   ensureMatchesCreationFilter,
   filterCreatableRecords,
   getFilterComparisons,
   getFilterFields,
   getFilterOmitting,
+  InvalidRelationJoinConditionError,
   invertSort,
   mergeFilter,
   mergeFilters,
   mergeQuery,
   QueryFieldMap,
+  RELATION_JOIN_CONDITION_KEY,
+  relationJoinCondition,
+  RelationJoinConditionFilter,
+  RelationJoinConditionScope,
   transformAggregateQuery,
   transformAggregateResponse,
   transformFilter,
   transformFilterComparisons,
   transformQuery,
-  transformSort
+  transformSort,
+  UnsupportedRelationJoinConditionError
 } from './helpers'
 export * from './interfaces'
 export { NestjsQueryCoreModule, NestjsQueryCoreModuleOpts } from './module'

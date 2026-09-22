@@ -1,4 +1,11 @@
-import { AggregateQuery, Filter, Query, SortDirection, SortField } from '@ptc-org/nestjs-query-core'
+import {
+  AggregateQuery,
+  assertNoRelationJoinConditions,
+  Filter,
+  Query,
+  SortDirection,
+  SortField
+} from '@ptc-org/nestjs-query-core'
 import { Document, Model as MongooseModel, QueryFilter } from 'mongoose'
 
 import { AggregateBuilder, MongooseGroupAndAggregate } from './aggregate.builder'
@@ -75,6 +82,7 @@ export class FilterQueryBuilder<Entity extends Document> {
     if (!filter) {
       return {}
     }
+    assertNoRelationJoinConditions(filter as Filter<unknown>)
     return this.whereBuilder.build(filter)
   }
 

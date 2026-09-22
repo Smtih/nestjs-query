@@ -1,6 +1,6 @@
 ---
 title: 'v10.x.x to v11.x.x'
-description: 'Migrate query limits, CSV exports, and REST Swagger dependencies.'
+description: 'Migrate query limits, the reserved relation join condition key, CSV exports, and REST Swagger dependencies.'
 ---
 
 In v11, the default `maxResultsSize` is `100` for both GraphQL and REST, up from `50` in v10. This affects endpoints that use the generated paging arguments without an explicit maximum.
@@ -66,3 +66,33 @@ Applications that do not use CSV export can omit it.
 ## REST Swagger runtime dependency
 
 `@ptc-org/nestjs-query-rest` requires `@nestjs/swagger` at runtime, even when an application does not generate OpenAPI documentation. Its `@ApiProperty` decorators run when REST DTO classes are defined, so the dependency cannot be loaded lazily. Keep `@nestjs/swagger` installed when upgrading.
+
+## `joinOn` is reserved in relation filters
+
+In v11, the filter of a relation can carry a `joinOn` key whose conditions go into that relation's
+`JOIN ... ON` clause instead of the `WHERE` clause, so that records with no matching related row are
+still returned. See
+[relation join conditions](/concepts/queries#relation-join-conditions).
+
+The key is reserved at the query service layer, in every filter a query service is given. A filter
+written in server code - an authorizer filter, a `queryService.query(...)` call, or a custom
+resolver - therefore cannot use `joinOn` as the name of a field on a relation: it is read as join
+conditions instead. A filter that uses it anywhere other than the filter of a relation raises an
+`InvalidRelationJoinConditionError` rather than being dropped from the query.
+
+The key is **not** exposed through the generated GraphQL schema. Schema generation is unchanged, so
+an existing application's schema is byte-identical on upgrade, and no client can send the key.
+
+Only `@ptc-org/nestjs-query-typeorm` builds these conditions into a query. The query services of the
+other persistence packages reject a filter carrying the key with an
+`UnsupportedRelationJoinConditionError`, rather than reading `joinOn` as the name of a field and
+answering a different question. A hand-written `QueryService` that cannot honour the key should call
+`assertNoRelationJoinConditions` on the filters it is given.
+
+Where the key is valid is a property of the filter language rather than of any one persistence
+package, so the rules live in `@ptc-org/nestjs-query-core`. A package that adds support calls
+`assertValidRelationJoinConditionPlacement(filter, scope)`, where `scope` is a
+`RelationJoinConditionScope` - a function from a filter key to the scope of the relation it names,
+or `undefined` when it names no relation - built from that package's own metadata. Core enforces the
+placement rules and raises `InvalidRelationJoinConditionError`, so two adapters cannot drift apart on
+what the key means.

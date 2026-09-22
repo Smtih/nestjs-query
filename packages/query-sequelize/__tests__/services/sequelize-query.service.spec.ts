@@ -1,7 +1,7 @@
 import { BadRequestException } from '@nestjs/common'
 import { InjectModel, SequelizeModule } from '@nestjs/sequelize'
 import { Test, TestingModule } from '@nestjs/testing'
-import { DeepPartial } from '@ptc-org/nestjs-query-core'
+import { DeepPartial, Filter, relationJoinCondition, UnsupportedRelationJoinConditionError } from '@ptc-org/nestjs-query-core'
 import { ModelCtor, Sequelize } from 'sequelize-typescript'
 
 import { SequelizeQueryService } from '../../src'
@@ -45,6 +45,15 @@ describe('SequelizeQueryService', (): void => {
   it('should create a filterQueryBuilder and assemblerService based on the repo passed in if not provided', () => {
     const queryService = moduleRef.get(TestEntityService)
     expect(queryService.filterQueryBuilder).toBeInstanceOf(FilterQueryBuilder)
+  })
+
+  describe('relation join conditions', () => {
+    it('should reject a filter that carries them rather than reading the key as a field', async () => {
+      const queryService = moduleRef.get(TestEntityService)
+      const filter = { testRelations: relationJoinCondition<TestRelation>({ relationName: { eq: 'a' } }) } as Filter<TestEntity>
+
+      await expect(queryService.query({ filter })).rejects.toThrow(UnsupportedRelationJoinConditionError)
+    })
   })
 
   describe('#query', () => {

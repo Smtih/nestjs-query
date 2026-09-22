@@ -2,7 +2,13 @@
 import { InjectModel, TypegooseModule } from '@m8a/nestjs-typegoose'
 import { BadRequestException } from '@nestjs/common'
 import { Test, TestingModule } from '@nestjs/testing'
-import { FindRelationOptions, SortDirection } from '@ptc-org/nestjs-query-core'
+import {
+  Filter,
+  FindRelationOptions,
+  relationJoinCondition,
+  SortDirection,
+  UnsupportedRelationJoinConditionError
+} from '@ptc-org/nestjs-query-core'
 import { DocumentType, getModelForClass, mongoose } from '@typegoose/typegoose'
 
 import { NestjsQueryTypegooseModule } from '../../src'
@@ -87,6 +93,15 @@ describe('TypegooseQueryService', () => {
   beforeEach(async () => mongo.prepareDb())
 
   afterEach(async () => mongo.clearDatabase())
+
+  describe('relation join conditions', () => {
+    it('should reject a filter that carries them rather than reading the key as a field', async () => {
+      const queryService = moduleRef.get(TestEntityService)
+      const filter = { testReference: relationJoinCondition({ referenceName: { eq: 'a' } }) } as Filter<TestEntity>
+
+      await expect(queryService.query({ filter })).rejects.toThrow(UnsupportedRelationJoinConditionError)
+    })
+  })
 
   describe('#query', () => {
     it('call find and return the result', async () => {

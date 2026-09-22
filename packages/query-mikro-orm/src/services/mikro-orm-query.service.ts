@@ -3,6 +3,7 @@ import { OperatorMap } from '@mikro-orm/core/typings'
 import {
   Assembler,
   AssemblerFactory,
+  assertNoRelationJoinConditions,
   Class,
   CountOptions,
   Filter,
@@ -90,6 +91,8 @@ export class MikroOrmQueryService<DTO extends object, Entity extends object = DT
     if (!filter) {
       return {} as FilterQuery<Entity>
     }
+
+    assertNoRelationJoinConditions(filter as Filter<unknown>)
 
     const convertedFilter = this.assembler?.convertQuery?.({ filter } as Query<DTO>)?.filter ?? filter
 
