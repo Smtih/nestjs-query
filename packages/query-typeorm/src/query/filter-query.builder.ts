@@ -70,8 +70,8 @@ export interface NestedRecord<E = unknown> {
  */
 export interface NestedRelationAliased {
   alias: string
-  metadata: EntityMetadata
-  relations: NestedRelationsAliased
+  metadata?: EntityMetadata
+  relations?: NestedRelationsAliased
 }
 
 /**
@@ -333,7 +333,7 @@ export class FilterQueryBuilder<Entity> {
     // TODO:: If relation is not nullable use inner join?
     return referencedRelations.reduce((rqb, [relationKey, relation]) => {
       const relationAlias = relation.alias
-      const relationChildren = relation.relations
+      const relationChildren = relation.relations ?? {}
 
       const selectRelation = selectRelations && selectRelations.find(({ name }) => name === relationKey)
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -376,7 +376,7 @@ export class FilterQueryBuilder<Entity> {
 
     return this.whereBuilder
       .deriveForEntityMetadata<Relation>(relation.metadata)
-      .build(qb, filter, relation.relations, relation.alias)
+      .build(qb, filter, relation.relations ?? {}, relation.alias)
   }
 
   /**

@@ -181,7 +181,7 @@ export class WhereBuilder<Entity> {
         const nestedRelationAliased = relationNames[field as string]
         const relationWhere = this.deriveForEntityMetadata<Entity[T]>(nestedRelationAliased.metadata)
         const nestedRelationAliasedAlias = nestedRelationAliased.alias
-        const nestedRelationAliasedRelationNames = nestedRelationAliased.relations
+        const nestedRelationAliasedRelationNames = nestedRelationAliased.relations ?? {}
 
         return relationWhere.build(qb, cmp, nestedRelationAliasedRelationNames, nestedRelationAliasedAlias)
       })
