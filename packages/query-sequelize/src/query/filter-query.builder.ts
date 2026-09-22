@@ -1,6 +1,7 @@
 import {
   AggregateQuery,
   AggregateQueryField,
+  assertNoRelationJoinConditions,
   Filter,
   getFilterFields,
   Paging,
@@ -175,6 +176,7 @@ export class FilterQueryBuilder<Entity extends Model<Entity, Partial<Entity>>> {
     if (!filter) {
       return filterable
     }
+    assertNoRelationJoinConditions(filter as Filter<unknown>)
     // eslint-disable-next-line no-param-reassign
     filterable.where = this.whereBuilder.build(filter, this.getReferencedRelations(filter))
     return filterable

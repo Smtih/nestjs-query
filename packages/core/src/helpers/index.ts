@@ -10,3 +10,13 @@ export {
   transformQuery,
   transformSort
 } from './query.helpers'
+export {
+  assertNoRelationJoinConditions,
+  assertValidRelationJoinConditionPlacement,
+  InvalidRelationJoinConditionError,
+  RELATION_JOIN_CONDITION_KEY,
+  relationJoinCondition,
+  RelationJoinConditionFilter,
+  RelationJoinConditionScope,
+  UnsupportedRelationJoinConditionError
+} from './relation-join-condition'

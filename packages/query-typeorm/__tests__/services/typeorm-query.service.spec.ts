@@ -6,6 +6,7 @@ import {
   Filter,
   FilterComparisonOperators,
   Query,
+  relationJoinCondition,
   SelectRelation,
   SortDirection
 } from '@ptc-org/nestjs-query-core'
@@ -260,6 +261,38 @@ describe('TypeOrmQueryService', (): void => {
         })
 
         expect(queryResult).toMatchObject(TEST_RELATIONS[0])
+      })
+
+      it('should be used for the conditions a relation filter adds to its JOIN ON clause', () => {
+        const [joinOnClause, whereClause] = queryService.filterQueryBuilder
+          .select({
+            filter: {
+              testRelations: {
+                ...relationJoinCondition<TestRelation>({ relationName: { eq: upperCasedRelationName } }),
+                testRelationPk: { is: null }
+              }
+            }
+          })
+          .getQuery()
+          .split(' WHERE ')
+
+        expect(joinOnClause).toContain('LEFT JOIN')
+        expect(joinOnClause).toContain('LOWER(')
+        expect(whereClause).not.toContain('LOWER(')
+      })
+
+      it('should decide which rows a JOIN ON condition matches', async () => {
+        const queryResult = await queryService.query({
+          filter: {
+            testRelations: {
+              ...relationJoinCondition<TestRelation>({ relationName: { eq: upperCasedRelationName } }),
+              testRelationPk: { is: null }
+            }
+          },
+          sorting: [{ field: 'numberType', direction: SortDirection.ASC }]
+        })
+
+        expect(queryResult).toEqual(TEST_ENTITIES.slice(1))
       })
     })
 
@@ -549,6 +582,49 @@ describe('TypeOrmQueryService', (): void => {
             paging: { limit: 2 }
           })
           expect(queryResult).toEqual([entity, TEST_ENTITIES[1]])
+        })
+      })
+
+      describe('join conditions', () => {
+        const matchedRelationName = TEST_RELATIONS[0].relationName
+        const inSeedOrder = [{ field: 'numberType' as const, direction: SortDirection.ASC }]
+
+        it('should keep entities that have no relation matching the conditions', async () => {
+          const queryService = moduleRef.get(TestEntityService)
+
+          const queryResult = await queryService.query({
+            filter: { testRelations: relationJoinCondition<TestRelation>({ relationName: { eq: matchedRelationName } }) },
+            sorting: inSeedOrder
+          })
+
+          expect(queryResult).toEqual(TEST_ENTITIES)
+        })
+
+        it('should drop those entities when the same conditions are in the where clause', async () => {
+          const queryService = moduleRef.get(TestEntityService)
+
+          const queryResult = await queryService.query({
+            filter: { testRelations: { relationName: { eq: matchedRelationName } } },
+            sorting: inSeedOrder
+          })
+
+          expect(queryResult).toEqual([TEST_ENTITIES[0]])
+        })
+
+        it('should filter on the joined rows with a sibling filter, so an anti join can be expressed', async () => {
+          const queryService = moduleRef.get(TestEntityService)
+
+          const queryResult = await queryService.query({
+            filter: {
+              testRelations: {
+                ...relationJoinCondition<TestRelation>({ relationName: { eq: matchedRelationName } }),
+                testRelationPk: { is: null }
+              }
+            },
+            sorting: inSeedOrder
+          })
+
+          expect(queryResult).toEqual(TEST_ENTITIES.slice(1))
         })
       })
 

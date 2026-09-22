@@ -1,8 +1,10 @@
 import {
   AggregateQuery,
   AggregateQueryField,
+  assertValidRelationJoinConditionPlacement,
   Filter,
   getFilterFields,
+  InvalidRelationJoinConditionError,
   Paging,
   Query,
   SelectRelation,
@@ -23,6 +25,13 @@ import { SoftDeleteQueryBuilder } from 'typeorm/query-builder/SoftDeleteQueryBui
 
 import { AggregateBuilder } from './aggregate.builder'
 import { deriveBuilder } from './derive-builder'
+import {
+  EMPTY_JOIN_CONDITION,
+  getJoinConditionFilter,
+  isFilter,
+  JoinCondition,
+  relationJoinConditionScope
+} from './join-condition'
 import { SQLComparisonBuilder } from './sql-comparison.builder'
 import { WhereBuilder } from './where.builder'
 
@@ -72,6 +81,7 @@ export interface NestedRelationAliased {
   alias: string
   metadata?: EntityMetadata
   relations?: NestedRelationsAliased
+  joinCondition?: Filter<unknown>
 }
 
 /**
@@ -334,24 +344,45 @@ export class FilterQueryBuilder<Entity> {
     return referencedRelations.reduce((rqb, [relationKey, relation]) => {
       const relationAlias = relation.alias
       const relationChildren = relation.relations ?? {}
+      const { condition, params } = this.joinConditionOf(relationKey, relation)
 
       const selectRelation = selectRelations && selectRelations.find(({ name }) => name === relationKey)
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
 
       if (selectRelation) {
-        rqb = rqb.leftJoinAndSelect(`${alias ?? rqb.alias}.${relationKey}`, relationAlias)
+        rqb = rqb.leftJoinAndSelect(`${alias ?? rqb.alias}.${relationKey}`, relationAlias, condition, params)
         // Apply filter for the current relation
         rqb = this.applySelectedRelationFilter(rqb, relation, selectRelation.query.filter)
         return this.applyRelationJoinsRecursive(rqb, relationChildren, selectRelation.query.relations, relationAlias)
       }
 
       return this.applyRelationJoinsRecursive(
-        rqb.leftJoin(`${alias ?? rqb.alias}.${relationKey}`, relationAlias),
+        rqb.leftJoin(`${alias ?? rqb.alias}.${relationKey}`, relationAlias, condition, params),
         relationChildren,
         [],
         relationAlias
       )
     }, qb)
+  }
+
+  /**
+   * Builds the conditions a relation's filter adds to that relation's `JOIN ... ON` clause.
+   *
+   * @param relationKey - the property the relation is referenced by.
+   * @param relation - the relation, with the alias it is joined under.
+   */
+  private joinConditionOf(relationKey: string, relation: NestedRelationAliased): JoinCondition {
+    if (!relation.joinCondition) {
+      return EMPTY_JOIN_CONDITION
+    }
+
+    if (!relation.metadata) {
+      throw new InvalidRelationJoinConditionError(
+        `Cannot build the JOIN ON conditions of "${relationKey}" without the metadata of the relation.`
+      )
+    }
+
+    return this.whereBuilder.buildRelationJoinCondition(relation.joinCondition, relation.metadata, relation.alias)
   }
 
   /**
@@ -420,13 +451,27 @@ export class FilterQueryBuilder<Entity> {
     filter: Filter<unknown> = {},
     selectRelations: SelectRelation<Entity>[] = []
   ): NestedRelationsAliased {
+    assertValidRelationJoinConditionPlacement(filter, relationJoinConditionScope(metadata))
+
     const referencedRelations = this.getReferencedRelationsRecursive(metadata, filter, selectRelations)
-    return this.injectRelationsAliasRecursive(metadata, referencedRelations)
+    return this.injectRelationsAliasRecursive(metadata, referencedRelations, [filter], selectRelations)
   }
 
-  private injectRelationsAliasRecursive(
+  /**
+   * @param metadata - metadata of the entity the filters filter.
+   * @param relations - the relations referenced at this level, and below it.
+   * @param filters - every filter of the entity at this level. A relation is joined once, but can
+   * be filtered by more than one filter: the filter the query descended through, and the filter of
+   * a selected relation, which filter the same rows through the same join.
+   * @param selectRelations - the relations selected at this level.
+   * @param counter - the number of times each relation name has been joined, which makes the
+   * aliases of a relation joined more than once unique.
+   */
+  private injectRelationsAliasRecursive<DTO>(
     metadata: EntityMetadata,
     relations: NestedRecord,
+    filters: Filter<unknown>[],
+    selectRelations: SelectRelation<DTO>[] = [],
     counter = new Map<string, number>()
   ): NestedRelationsAliased {
     return Object.entries(relations).reduce((prev, [name, children]) => {
@@ -440,15 +485,74 @@ export class FilterQueryBuilder<Entity> {
       const alias = count === 0 ? name : `${name}_${count}`
       counter.set(name, count)
 
+      const relationFilters = filters.map((entityFilter) => entityFilter[name] as unknown).filter(isFilter)
+      const joinCondition = this.joinConditionOfRelation(name, relationFilters)
+      const selectRelation = selectRelations.find(({ name: selectedName }) => selectedName === name)
+      const selectedFilter = this.selectedRelationFilter(selectRelation, relationMetadata)
+
       return {
         ...prev,
         [name]: {
           alias,
           metadata: relationMetadata,
-          relations: this.injectRelationsAliasRecursive(relationMetadata, children, counter)
+          relations: this.injectRelationsAliasRecursive(
+            relationMetadata,
+            children,
+            selectedFilter ? [...relationFilters, selectedFilter] : relationFilters,
+            selectRelation?.query.relations ?? [],
+            counter
+          ),
+          ...(joinCondition ? { joinCondition } : {})
         }
       }
     }, {})
+  }
+
+  /**
+   * The conditions one relation's `JOIN ... ON` clause is given by the filters of that relation.
+   *
+   * A relation is joined once however many filters reference it, so conditions from two of them
+   * are refused rather than one of them being dropped from the query.
+   *
+   * @param name - the property the relation is referenced by.
+   * @param relationFilters - every filter of the relation at this level.
+   */
+  private joinConditionOfRelation(name: string, relationFilters: Filter<unknown>[]): Filter<unknown> | undefined {
+    const joinConditions = relationFilters.map(getJoinConditionFilter).filter(isFilter)
+
+    if (joinConditions.length > 1) {
+      throw new InvalidRelationJoinConditionError(
+        `"${name}" is joined once, and carries join conditions in more than one of the filters that reference it. ` +
+          'Write the conditions in one of them, or filter the relation through a single filter.'
+      )
+    }
+
+    return joinConditions[0]
+  }
+
+  /**
+   * The filter of a selected relation, checked for a misplaced join condition key.
+   *
+   * A selected relation's filter filters the rows the relation is selected as, so it is a filter of
+   * that relation's entity in the same position a query's own filter is: it can carry join
+   * conditions for the relations it descends into, but has no join of its own to add them to.
+   *
+   * @param selectRelation - the selected relation, if the relation is selected.
+   * @param relationMetadata - metadata of the relation.
+   */
+  private selectedRelationFilter<DTO>(
+    selectRelation: SelectRelation<DTO> | undefined,
+    relationMetadata: EntityMetadata
+  ): Filter<unknown> | undefined {
+    const filter = selectRelation?.query.filter as Filter<unknown> | undefined
+
+    if (!filter) {
+      return undefined
+    }
+
+    assertValidRelationJoinConditionPlacement(filter, relationJoinConditionScope(relationMetadata))
+
+    return filter
   }
 
   public getReferencedRelationsRecursive(

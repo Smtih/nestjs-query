@@ -2,7 +2,13 @@
 import { BadRequestException } from '@nestjs/common'
 import { InjectModel, MongooseModule } from '@nestjs/mongoose'
 import { Test, TestingModule } from '@nestjs/testing'
-import { SortDirection } from '@ptc-org/nestjs-query-core'
+import {
+  Filter,
+  QueryService,
+  relationJoinCondition,
+  SortDirection,
+  UnsupportedRelationJoinConditionError
+} from '@ptc-org/nestjs-query-core'
 import { Document, Model, Types } from 'mongoose'
 
 import { NestjsQueryMongooseModule } from '../../src'
@@ -90,6 +96,15 @@ describe('MongooseQueryService', () => {
   beforeEach(() => mongo.prepareDb())
 
   afterEach(() => mongo.dropDatabase())
+
+  describe('relation join conditions', () => {
+    it('should reject a filter that carries them rather than reading the key as a field', async () => {
+      const queryService: QueryService<TestEntity> = moduleRef.get(TestEntityService)
+      const filter = { testReference: relationJoinCondition({ referenceName: { eq: 'a' } }) } as Filter<TestEntity>
+
+      await expect(queryService.query({ filter })).rejects.toThrow(UnsupportedRelationJoinConditionError)
+    })
+  })
 
   describe('#query', () => {
     it('call find and return the result', async () => {
