@@ -31,6 +31,7 @@ export {
   hasRelationJoinConditions,
   InvalidRelationJoinConditionError,
   invertSort,
+  isFilter,
   mergeFilter,
   mergeFilters,
   mergeQuery,

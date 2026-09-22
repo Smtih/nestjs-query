@@ -11,7 +11,7 @@ import type { WhereExpressionBuilder } from 'typeorm'
 
 import { deriveBuilder } from './derive-builder'
 import { NestedRelationsAliased } from './filter-query.builder'
-import { combineJoinConditions, hasWhereConditions, JoinCondition } from './join-condition'
+import { combineJoinOnPredicates, hasWhereConditions, JoinOnPredicate } from './join-condition'
 import { EntityComparisonField, SQLComparisonBuilder } from './sql-comparison.builder'
 
 /**
@@ -84,7 +84,7 @@ export class WhereBuilder<Entity> {
     filter: Filter<Relation>,
     relationMetadata: EntityMetadata,
     alias: string
-  ): JoinCondition {
+  ): JoinOnPredicate {
     return this.deriveForEntityMetadata<Relation>(relationMetadata).buildJoinCondition(filter, alias)
   }
 
@@ -204,18 +204,18 @@ export class WhereBuilder<Entity> {
    * @param filter - the filter to build the predicate from.
    * @param alias - the alias the filtered entity is joined under.
    */
-  private buildJoinCondition(filter: Filter<Entity>, alias: string): JoinCondition {
-    return combineJoinConditions(
+  private buildJoinCondition(filter: Filter<Entity>, alias: string): JoinOnPredicate {
+    return combineJoinOnPredicates(
       Object.keys(filter).map((field) => this.joinConditionForField(filter, field, alias)),
       ' AND '
     )
   }
 
-  private joinConditionForField(filter: Filter<Entity>, field: string, alias: string): JoinCondition {
+  private joinConditionForField(filter: Filter<Entity>, field: string, alias: string): JoinOnPredicate {
     if (field === 'and' || field === 'or') {
       const branches = filter[field] ?? []
 
-      return combineJoinConditions(
+      return combineJoinOnPredicates(
         branches.map((branch) => this.buildJoinCondition(branch, alias)),
         field === 'and' ? ' AND ' : ' OR '
       )
@@ -228,7 +228,7 @@ export class WhereBuilder<Entity> {
     field: T,
     cmp: FilterFieldComparison<Entity[T]>,
     alias: string
-  ): JoinCondition {
+  ): JoinOnPredicate {
     const comparisons = Object.keys(cmp).map((cmpType) => {
       const { sql, params } = this.sqlComparisonBuilder.build(
         field,
@@ -240,7 +240,7 @@ export class WhereBuilder<Entity> {
       return { condition: sql, params }
     })
 
-    return combineJoinConditions(comparisons, ' OR ')
+    return combineJoinOnPredicates(comparisons, ' OR ')
   }
 
   private withRelationFilter<T extends keyof Entity, Where extends WhereExpressionBuilder>(

@@ -2,6 +2,7 @@ import {
   Filter,
   hasRelationJoinConditions,
   InvalidRelationJoinConditionError,
+  isFilter,
   RELATION_JOIN_CONDITION_KEY,
   RelationJoinConditionScope
 } from '@ptc-org/nestjs-query-core'
@@ -14,7 +15,7 @@ import { EntityMetadata, ObjectLiteral } from 'typeorm'
  * it. An empty condition leaves the join with only the predicate `typeorm` derives from the
  * relation's metadata.
  */
-export interface JoinCondition {
+export interface JoinOnPredicate {
   condition?: string
   params?: ObjectLiteral
 }
@@ -22,7 +23,7 @@ export interface JoinCondition {
 /**
  * @internal
  */
-export const EMPTY_JOIN_CONDITION: JoinCondition = {}
+export const EMPTY_JOIN_ON_PREDICATE: JoinOnPredicate = {}
 
 /**
  * @internal
@@ -37,17 +38,6 @@ export function relationJoinConditionScope(metadata: EntityMetadata): RelationJo
 
     return relation ? relationJoinConditionScope(relation.inverseEntityMetadata) : undefined
   }
-}
-
-/**
- * @internal
- *
- * Whether a value is a filter, rather than a comparison value or a list of filters.
- *
- * @param value - the value to check.
- */
-export function isFilter(value: unknown): value is Filter<unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 /**
@@ -82,17 +72,17 @@ export function hasWhereConditions(filter: Filter<unknown>): boolean {
 /**
  * @internal
  *
- * Joins conditions into a single condition, bracketing it when there is more than one so that it
+ * Joins predicates into a single predicate, bracketing it when there is more than one so that it
  * keeps its meaning next to the predicate `typeorm` derives from the relation's metadata.
  *
- * @param conditions - the conditions to combine.
+ * @param predicates - the predicates to combine.
  * @param operator - the SQL operator to combine them with.
  */
-export function combineJoinConditions(conditions: JoinCondition[], operator: ' AND ' | ' OR '): JoinCondition {
-  const present = conditions.filter(({ condition }) => condition)
+export function combineJoinOnPredicates(predicates: JoinOnPredicate[], operator: ' AND ' | ' OR '): JoinOnPredicate {
+  const present = predicates.filter(({ condition }) => condition)
 
   if (!present.length) {
-    return EMPTY_JOIN_CONDITION
+    return EMPTY_JOIN_ON_PREDICATE
   }
 
   const params = present.reduce<ObjectLiteral>((merged, { params: conditionParams }) => ({ ...merged, ...conditionParams }), {})

@@ -5,6 +5,7 @@ import {
   Filter,
   getFilterFields,
   InvalidRelationJoinConditionError,
+  isFilter,
   Paging,
   Query,
   SelectRelation,
@@ -27,10 +28,9 @@ import { AggregateBuilder } from './aggregate.builder'
 import { deriveBuilder } from './derive-builder'
 import {
   assertNoConditionsWithoutAJoin,
-  EMPTY_JOIN_CONDITION,
+  EMPTY_JOIN_ON_PREDICATE,
   getJoinConditionFilter,
-  isFilter,
-  JoinCondition,
+  JoinOnPredicate,
   relationJoinConditionScope
 } from './join-condition'
 import { SQLComparisonBuilder } from './sql-comparison.builder'
@@ -82,7 +82,7 @@ export interface NestedRelationAliased {
   alias: string
   metadata?: EntityMetadata
   relations?: NestedRelationsAliased
-  joinCondition?: Filter<unknown>
+  joinOn?: { conditions: Filter<unknown>; metadata: EntityMetadata }
 }
 
 /**
@@ -193,8 +193,6 @@ export class FilterQueryBuilder<Entity> {
    * @param query - the query to apply.
    */
   public delete(query: Query<Entity>): DeleteQueryBuilder<Entity> {
-    assertNoConditionsWithoutAJoin(query.filter, 'a DELETE statement')
-
     return this.applyFilter(this.repo.createQueryBuilder().delete(), query.filter)
   }
 
@@ -204,8 +202,6 @@ export class FilterQueryBuilder<Entity> {
    * @param query - the query to apply.
    */
   public softDelete(query: Query<Entity>): SoftDeleteQueryBuilder<Entity> {
-    assertNoConditionsWithoutAJoin(query.filter, 'a soft delete statement')
-
     return this.applyFilter(this.repo.createQueryBuilder().softDelete() as SoftDeleteQueryBuilder<Entity>, query.filter)
   }
 
@@ -215,8 +211,6 @@ export class FilterQueryBuilder<Entity> {
    * @param query - the query to apply.
    */
   public update(query: Query<Entity>): UpdateQueryBuilder<Entity> {
-    assertNoConditionsWithoutAJoin(query.filter, 'an UPDATE statement')
-
     const qb = this.applyFilter(this.repo.createQueryBuilder().update(), query.filter)
     return this.applySorting(qb, query.sorting)
   }
@@ -260,6 +254,10 @@ export class FilterQueryBuilder<Entity> {
   public applyFilter<Where extends WhereExpressionBuilder>(qb: Where, filter?: Filter<Entity>, alias?: string): Where {
     if (!filter) {
       return qb
+    }
+
+    if (!(qb instanceof SelectQueryBuilder)) {
+      assertNoConditionsWithoutAJoin(filter, 'a DELETE, UPDATE or soft delete statement')
     }
 
     return this.whereBuilder.build(qb, filter, this.getReferencedRelationsWithAliasRecursive(this.repo.metadata, filter), alias)
@@ -351,7 +349,7 @@ export class FilterQueryBuilder<Entity> {
     return referencedRelations.reduce((rqb, [relationKey, relation]) => {
       const relationAlias = relation.alias
       const relationChildren = relation.relations ?? {}
-      const { condition, params } = this.joinConditionOf(relationKey, relation)
+      const { condition, params } = this.joinConditionOf(relation)
 
       const selectRelation = selectRelations && selectRelations.find(({ name }) => name === relationKey)
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
@@ -375,21 +373,14 @@ export class FilterQueryBuilder<Entity> {
   /**
    * Builds the conditions a relation's filter adds to that relation's `JOIN ... ON` clause.
    *
-   * @param relationKey - the property the relation is referenced by.
    * @param relation - the relation, with the alias it is joined under.
    */
-  private joinConditionOf(relationKey: string, relation: NestedRelationAliased): JoinCondition {
-    if (!relation.joinCondition) {
-      return EMPTY_JOIN_CONDITION
+  private joinConditionOf(relation: NestedRelationAliased): JoinOnPredicate {
+    if (!relation.joinOn) {
+      return EMPTY_JOIN_ON_PREDICATE
     }
 
-    if (!relation.metadata) {
-      throw new InvalidRelationJoinConditionError(
-        `Cannot build the JOIN ON conditions of "${relationKey}" without the metadata of the relation.`
-      )
-    }
-
-    return this.whereBuilder.buildRelationJoinCondition(relation.joinCondition, relation.metadata, relation.alias)
+    return this.whereBuilder.buildRelationJoinCondition(relation.joinOn.conditions, relation.joinOn.metadata, relation.alias)
   }
 
   /**
@@ -493,9 +484,13 @@ export class FilterQueryBuilder<Entity> {
       counter.set(name, count)
 
       const relationFilters = filters.map((entityFilter) => entityFilter[name] as unknown).filter(isFilter)
-      const joinCondition = this.joinConditionOfRelation(name, relationFilters)
+      const joinConditions = this.soleJoinConditionOf(name, relationFilters)
       const selectRelation = selectRelations.find(({ name: selectedName }) => selectedName === name)
-      const selectedFilter = this.selectedRelationFilter(selectRelation, relationMetadata)
+      const selectedFilter = selectRelation?.query.filter as Filter<unknown> | undefined
+
+      if (selectedFilter) {
+        assertValidRelationJoinConditionPlacement(selectedFilter, relationJoinConditionScope(relationMetadata))
+      }
 
       return {
         ...prev,
@@ -509,14 +504,15 @@ export class FilterQueryBuilder<Entity> {
             selectRelation?.query.relations ?? [],
             counter
           ),
-          ...(joinCondition ? { joinCondition } : {})
+          ...(joinConditions ? { joinOn: { conditions: joinConditions, metadata: relationMetadata } } : {})
         }
       }
     }, {})
   }
 
   /**
-   * The conditions one relation's `JOIN ... ON` clause is given by the filters of that relation.
+   * The only conditions one relation's `JOIN ... ON` clause is given by the filters of that
+   * relation.
    *
    * A relation is joined once however many filters reference it, so conditions from two of them
    * are refused rather than one of them being dropped from the query.
@@ -524,7 +520,7 @@ export class FilterQueryBuilder<Entity> {
    * @param name - the property the relation is referenced by.
    * @param relationFilters - every filter of the relation at this level.
    */
-  private joinConditionOfRelation(name: string, relationFilters: Filter<unknown>[]): Filter<unknown> | undefined {
+  private soleJoinConditionOf(name: string, relationFilters: Filter<unknown>[]): Filter<unknown> | undefined {
     const joinConditions = relationFilters.map(getJoinConditionFilter).filter(isFilter)
 
     if (joinConditions.length > 1) {
@@ -535,31 +531,6 @@ export class FilterQueryBuilder<Entity> {
     }
 
     return joinConditions[0]
-  }
-
-  /**
-   * The filter of a selected relation, checked for a misplaced join condition key.
-   *
-   * A selected relation's filter filters the rows the relation is selected as, so it is a filter of
-   * that relation's entity in the same position a query's own filter is: it can carry join
-   * conditions for the relations it descends into, but has no join of its own to add them to.
-   *
-   * @param selectRelation - the selected relation, if the relation is selected.
-   * @param relationMetadata - metadata of the relation.
-   */
-  private selectedRelationFilter<DTO>(
-    selectRelation: SelectRelation<DTO> | undefined,
-    relationMetadata: EntityMetadata
-  ): Filter<unknown> | undefined {
-    const filter = selectRelation?.query.filter as Filter<unknown> | undefined
-
-    if (!filter) {
-      return undefined
-    }
-
-    assertValidRelationJoinConditionPlacement(filter, relationJoinConditionScope(relationMetadata))
-
-    return filter
   }
 
   public getReferencedRelationsRecursive(

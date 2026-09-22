@@ -7,7 +7,7 @@ import {
 } from '@ptc-org/nestjs-query-core'
 import { DataSource, ObjectLiteral } from 'typeorm'
 
-import { FilterQueryBuilder, NestedRelationsAliased, RelationQueryBuilder } from '../../src/query'
+import { FilterQueryBuilder, RelationQueryBuilder } from '../../src/query'
 import { createTestConnection } from '../__fixtures__/connection.fixture'
 import { TestEntity } from '../__fixtures__/test.entity'
 import { TestRelation } from '../__fixtures__/test-relation.entity'
@@ -186,16 +186,6 @@ describe('relation join conditions', (): void => {
       )
       expect(selectSql(filter)).not.toContain(' WHERE ')
     })
-
-    it('should fail when the relation has no metadata to build the conditions against', () => {
-      const relations: NestedRelationsAliased = {
-        testRelations: { alias: 'testRelations', joinCondition: { relationName: { eq: 'a' } } as Filter<unknown> }
-      }
-
-      expect(() =>
-        getFilterQueryBuilder().applyRelationJoinsRecursive(dataSource.getRepository(TestEntity).createQueryBuilder(), relations)
-      ).toThrow(InvalidRelationJoinConditionError)
-    })
   })
 
   describe('without a join condition', () => {
@@ -365,6 +355,12 @@ describe('relation join conditions in a query that joins nothing', (): void => {
 
   it('should fail rather than soft delete every row when a soft delete filter carries them', () => {
     expect(() => getFilterQueryBuilder().softDelete({ filter })).toThrow(InvalidRelationJoinConditionError)
+  })
+
+  it('should fail for any query builder that cannot join, without the entry point asking it to', () => {
+    const deleteBuilder = dataSource.getRepository(TestEntity).createQueryBuilder().delete()
+
+    expect(() => getFilterQueryBuilder().applyFilter(deleteBuilder, filter)).toThrow(InvalidRelationJoinConditionError)
   })
 
   it('should fail rather than aggregate over every row when the filter of a relation aggregate carries them', () => {

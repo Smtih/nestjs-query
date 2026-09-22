@@ -1,4 +1,5 @@
 import { Filter } from '../interfaces'
+import { isFilter } from './filter.helpers'
 
 /**
  * The filter key reserved for a relation's `JOIN ... ON` conditions.
@@ -126,10 +127,6 @@ export type RelationJoinConditionScope = (key: string) => RelationJoinConditionS
  * the one relation being joined and nothing beyond it.
  */
 type JoinConditionPosition = 'root' | 'relation' | 'grouped' | 'condition'
-
-function isFilter(value: unknown): value is Filter<unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
 
 function asFilters(value: unknown): Filter<unknown>[] {
   return Array.isArray(value) ? value.filter(isFilter) : []

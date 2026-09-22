@@ -10,6 +10,15 @@ export type BetweenComparisonOperators = 'between' | 'notBetween'
 export type RangeComparisonOperators = 'gt' | 'gte' | 'lt' | 'lte'
 export type BooleanComparisonOperators = 'eq' | 'neq' | 'is' | 'isNot'
 
+/**
+ * Whether a value is a filter, rather than a comparison value or a list of filters.
+ *
+ * @param value - the value to check.
+ */
+export function isFilter(value: unknown): value is Filter<unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 export const isLikeComparisonOperator = (op: unknown): op is LikeComparisonOperators =>
   op === 'like' || op === 'notLike' || op === 'iLike' || op === 'notILike'
 
