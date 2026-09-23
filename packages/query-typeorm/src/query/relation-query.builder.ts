@@ -44,6 +44,9 @@ interface RelationQuery<Relation, Entity> {
 
   mapRelations<RawRelation>(entity: Entity, relations: Relation[], rawRelations: RawRelation[]): Relation[]
 
+  /**
+   * TODO:: Do this different? Maybe cleanup the batchSelect / whereCondition as its almost the same
+   */
   batchSelect(qb: SelectQueryBuilder<Relation>, entities: Entity[]): SelectQueryBuilder<Relation>
 
   whereCondition(entity: Entity): SQLFragment
