@@ -231,7 +231,7 @@ export class RelationQueryBuilder<Entity, Relation> {
   }
 
   private getManyToOneOrOneToOneOwnerMeta(relation: RelationMetadata): RelationQuery<Relation, Entity> {
-    const aliasName = relation.entityMetadata.tableName
+    const aliasName = this.ownerAlias
 
     const joins: JoinColumn[] = [
       {
@@ -582,6 +582,13 @@ export class RelationQueryBuilder<Entity, Relation> {
 
   private get unionAlias(): string {
     return 'unioned'
+  }
+
+  /**
+   * Alias of the owning entity join. It cannot be a relation property name, so it never collides with a filter join.
+   */
+  private get ownerAlias(): string {
+    return '__nestjsQuery__owner__'
   }
 
   private escapeName(str: string): string {
