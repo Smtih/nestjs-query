@@ -5,7 +5,6 @@ import { Brackets, ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm
 import { DriverUtils } from 'typeorm/driver/DriverUtils'
 import { ColumnMetadata } from 'typeorm/metadata/ColumnMetadata'
 import { RelationMetadata } from 'typeorm/metadata/RelationMetadata'
-import { Alias } from 'typeorm/query-builder/Alias'
 
 import { AggregateBuilder } from './aggregate.builder'
 import { FilterQueryBuilder } from './filter-query.builder'
@@ -74,13 +73,6 @@ export class RelationQueryBuilder<Entity, Relation> {
   private relationMetadata: RelationQuery<Relation, Entity> | undefined
 
   private paramCount: number
-
-  /**
-   * Will be filled if the query builder already contains the join
-   *
-   * TODO:: Do this different? Maybe cleanup the batchSelect / whereCondition as its almost the same
-   */
-  private existingAlias: Alias
 
   constructor(
     readonly repo: Repository<Entity>,
@@ -263,14 +255,11 @@ export class RelationQueryBuilder<Entity, Relation> {
       joins,
 
       mapRelations: <RawRelation>(entity: Entity, relations: Relation[], rawRelations: RawRelation[]): Relation[] => {
-        // Set the alias to use for the join
-        const joinAlias = this.existingAlias?.name || aliasName
-
         const rawFilter = relation.entityMetadata.primaryColumns.reduce(
           (columns, column) => ({
             ...columns,
 
-            [this.buildAlias(joinAlias, column.propertyName)]: column.getEntityValue(entity)
+            [this.buildAlias(aliasName, column.propertyName)]: column.getEntityValue(entity)
           }),
           {} as Partial<Entity>
         )
@@ -292,35 +281,26 @@ export class RelationQueryBuilder<Entity, Relation> {
       },
 
       batchSelect: (queryBuilder, entities) => {
-        this.existingAlias = queryBuilder.expressionMap.aliases.find((alias) => {
-          return alias.type === 'join' && alias.target === relation.entityMetadata.target
-        })
-
-        // Set the alias to use for the join
-        const joinAlias = this.existingAlias?.name || aliasName
-
         const whereParams: { [key: string]: unknown } = {}
         const whereCondition = relation.entityMetadata.primaryColumns
           .map((column) => {
-            const paramName = this.getParamName(joinAlias)
+            const paramName = this.getParamName(aliasName)
 
             whereParams[paramName] = entities.map((entity) => column.getEntityValue(entity) as unknown)
 
             // Also select the columns, so we can use them to map later
-            queryBuilder.addSelect(`${joinAlias}.${column.propertyPath}`, this.buildAlias(joinAlias, column.propertyName))
+            queryBuilder.addSelect(`${aliasName}.${column.propertyPath}`, this.buildAlias(aliasName, column.propertyName))
 
-            return `${joinAlias}.${column.propertyPath} IN (:...${paramName})`
+            return `${aliasName}.${column.propertyPath} IN (:...${paramName})`
           })
           .join(' AND ')
 
-        // Only add the joins if there was not an existing one yet for this relation
-        if (!this.existingAlias) {
-          queryBuilder = joins.reduce((qb, join) => {
-            const conditions = join.conditions.map(({ leftHand, rightHand }) => `${leftHand} = ${rightHand}`)
+        // Always add a dedicated owner join, a filter join to the same entity type can belong to another relation
+        queryBuilder = joins.reduce((qb, join) => {
+          const conditions = join.conditions.map(({ leftHand, rightHand }) => `${leftHand} = ${rightHand}`)
 
-            return qb.innerJoin(join.target, join.alias, conditions.join(' AND '))
-          }, queryBuilder)
-        }
+          return qb.innerJoin(join.target, join.alias, conditions.join(' AND '))
+        }, queryBuilder)
 
         return queryBuilder.andWhere(whereCondition, whereParams)
       },

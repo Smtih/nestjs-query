@@ -15,20 +15,21 @@ WHERE
   "test_entity"."test_entity_pk" IN (test-entity-id-1, test-entity-id-2)"
 `;
 
-exports[`RelationQueryBuilder #batchSelect should reuse existing join alias if there is one 1`] = `
+exports[`RelationQueryBuilder #batchSelect should add a dedicated owner join when a filter joins the owning entity type through another relation 1`] = `
 "SELECT
   "manyToOneRelation"."test_relation_pk" AS "manyToOneRelation_test_relation_pk",
   "manyToOneRelation"."relation_name" AS "manyToOneRelation_relation_name",
   "manyToOneRelation"."test_entity_id" AS "manyToOneRelation_test_entity_id",
   "manyToOneRelation"."uni_directional_test_entity_id" AS "manyToOneRelation_uni_directional_test_entity_id",
   "manyToOneRelation"."uni_directional_relation_test_entity_id" AS "manyToOneRelation_uni_directional_relation_test_entity_id",
-  "testEntity"."test_entity_pk" AS "manyToOneRelation_testEntity_testEntityPk"
+  "test_entity"."test_entity_pk" AS "manyToOneRelation_test_entity_testEntityPk"
 FROM
   "test_relation" "manyToOneRelation"
   LEFT JOIN "test_entity" "testEntity" ON "testEntity"."test_entity_pk" = "manyToOneRelation"."test_entity_id"
+  INNER JOIN "test_entity" "test_entity" ON "test_entity"."many_to_one_relation_id" = "manyToOneRelation"."test_relation_pk"
 WHERE
   (("testEntity"."test_entity_pk" = test))
-  AND "testEntity"."test_entity_pk" IN (test-entity-1)"
+  AND "test_entity"."test_entity_pk" IN (test-entity-1)"
 `;
 
 exports[`RelationQueryBuilder #select many to many many-to-many custom join table should work with a many-to-many through a join table 1`] = `

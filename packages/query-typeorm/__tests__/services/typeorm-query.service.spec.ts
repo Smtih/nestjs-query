@@ -60,6 +60,12 @@ describe('TypeOrmQueryService', (): void => {
     await refresh(dataSource)
   })
 
+  const pointManyToOneRelationAt = async (testEntityPk: string, testRelationPk: string): Promise<TestEntity> => {
+    const testEntityRepo = moduleRef.get(TestEntityService).repo
+    await testEntityRepo.update({ testEntityPk }, { manyToOneRelation: { testRelationPk } as TestRelation })
+    return testEntityRepo.findOneByOrFail({ testEntityPk })
+  }
+
   it('should create a filterQueryBuilder and assemblerService based on the repo passed in if not provided', () => {
     const queryService = moduleRef.get(TestEntityService)
     expect(queryService.filterQueryBuilder).toBeInstanceOf(FilterQueryBuilder)
@@ -861,6 +867,32 @@ describe('TypeOrmQueryService', (): void => {
           expect(queryResult.get(entities[1])).toEqual(expect.arrayContaining(expectRelations))
         })
       })
+
+      describe('when the filter joins the owning entity type', () => {
+        it('should match the single entity result when the join is through a different relation', async () => {
+          const owner = await pointManyToOneRelationAt('test-entity-2', 'test-relations-test-entity-3-1')
+          const queryService = moduleRef.get(TestEntityService)
+          const query = { filter: { testEntity: { testEntityPk: { eq: 'test-entity-3' } } } }
+
+          const single = await queryService.queryRelations(TestRelation, 'manyToOneRelation', owner, query)
+          const batch = await queryService.queryRelations(TestRelation, 'manyToOneRelation', [owner], query)
+
+          expect(single.map(({ testRelationPk }) => testRelationPk)).toEqual(['test-relations-test-entity-3-1'])
+          expect(batch.get(owner)).toEqual(single)
+        })
+
+        it('should match the single entity result when the join is through the inverse relation', async () => {
+          const owner = TEST_RELATIONS[0]
+          const queryService = moduleRef.get(TestRelationService)
+          const query = { filter: { testRelations: { relationName: { like: '%two' } } } }
+
+          const single = await queryService.queryRelations(TestEntity, 'testEntity', owner, query)
+          const batch = await queryService.queryRelations(TestEntity, 'testEntity', [owner], query)
+
+          expect(single.map(({ testEntityPk }) => testEntityPk)).toEqual([TEST_ENTITIES[0].testEntityPk])
+          expect(batch.get(owner)).toEqual(single)
+        })
+      })
     })
   })
 
@@ -1470,6 +1502,18 @@ describe('TypeOrmQueryService', (): void => {
             [entities[2], TEST_RELATIONS[6]]
           ])
         )
+      })
+
+      it('should match the single entity result when the filter joins the owning entity type through a different relation', async () => {
+        const owner = await pointManyToOneRelationAt('test-entity-2', 'test-relations-test-entity-3-1')
+        const queryService = moduleRef.get(TestEntityService)
+        const filter = { testEntity: { testEntityPk: { eq: 'test-entity-3' } } }
+
+        const single = await queryService.findRelation(TestRelation, 'manyToOneRelation', owner, { filter })
+        const batch = await queryService.findRelation(TestRelation, 'manyToOneRelation', [owner], { filter })
+
+        expect(single?.testRelationPk).toBe('test-relations-test-entity-3-1')
+        expect(batch.get(owner)).toEqual(single)
       })
 
       it('should return undefined select if no results are found.', async () => {
