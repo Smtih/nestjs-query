@@ -267,20 +267,7 @@ export class RelationQueryBuilder<Entity, Relation> {
           {} as Partial<Entity>
         )
 
-        // First filter the raw relations with the PK of the entity, then filter the relations
-        // with the PK of the raw relation
-        return lodashFilter(rawRelations, rawFilter).reduce((entityRelations: Relation[], rawRelation: RawRelation) => {
-          const filter = this.getRelationPrimaryKeysPropertyNameAndColumnsName().reduce(
-            (columns: Partial<Entity>, column) => ({
-              ...columns,
-
-              [column.propertyName]: rawRelation[column.columnName]
-            }),
-            {} as Partial<Entity>
-          )
-
-          return entityRelations.concat(lodashFilter(relations, filter) as Relation[])
-        }, [] as Relation[])
+        return this.relationsOfOwner(rawFilter, relations, rawRelations)
       },
 
       batchSelect: (queryBuilder, entities) => {
@@ -352,19 +339,7 @@ export class RelationQueryBuilder<Entity, Relation> {
           {} as Partial<Entity>
         )
 
-        // First filter the raw relations with the PK of the entity, then filter the relations
-        // with the PK of the raw relation
-        return lodashFilter(rawRelations, rawFilter).reduce((entityRelations, rawRelation) => {
-          const filter = this.getRelationPrimaryKeysPropertyNameAndColumnsName().reduce(
-            (columnsFilter, column) => ({
-              ...columnsFilter,
-              [column.propertyName]: rawRelation[column.columnName]
-            }),
-            {} as Partial<Entity>
-          )
-
-          return entityRelations.concat(lodashFilter(relations, filter) as Relation[])
-        }, [] as Relation[])
+        return this.relationsOfOwner(rawFilter, relations, rawRelations)
       },
       batchSelect: (qb: SelectQueryBuilder<Relation>, entities: Entity[]) => {
         const params = {}
@@ -555,19 +530,34 @@ export class RelationQueryBuilder<Entity, Relation> {
       {} as Partial<Entity>
     )
 
+    return this.relationsOfOwner(rawFilter, relations, rawRelations)
+  }
+
+  /**
+   * Picks the relations of one owner. A filter join can repeat a raw row, so each relation is returned once.
+   */
+  private relationsOfOwner<RawRelation>(
+    ownerRawFilter: Partial<Entity>,
+    relations: Relation[],
+    rawRelations: RawRelation[]
+  ): Relation[] {
     // First filter the raw relations with the PK of the entity, then filter the relations
     // with the PK of the raw relation
-    return lodashFilter(rawRelations, rawFilter).reduce((entityRelations, rawRelation) => {
-      const filter = this.getRelationPrimaryKeysPropertyNameAndColumnsName().reduce(
-        (columnsFilter, column) => ({
-          ...columnsFilter,
-          [column.propertyName]: rawRelation[column.columnName]
-        }),
-        {} as Partial<Entity>
-      )
+    const ownerRelations = lodashFilter(rawRelations, ownerRawFilter).flatMap(
+      (rawRelation) => lodashFilter(relations, this.relationPrimaryKeyFilter(rawRelation)) as Relation[]
+    )
 
-      return entityRelations.concat(lodashFilter(relations, filter) as Relation[])
-    }, [] as Relation[])
+    return [...new Set(ownerRelations)]
+  }
+
+  private relationPrimaryKeyFilter<RawRelation>(rawRelation: RawRelation): Partial<Relation> {
+    return this.getRelationPrimaryKeysPropertyNameAndColumnsName().reduce(
+      (columnsFilter, column) => ({
+        ...columnsFilter,
+        [column.propertyName]: rawRelation[column.columnName]
+      }),
+      {} as Partial<Relation>
+    )
   }
 
   private getParamName(prefix: string): string {

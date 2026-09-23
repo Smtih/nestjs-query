@@ -892,6 +892,22 @@ describe('TypeOrmQueryService', (): void => {
           expect(single.map(({ testEntityPk }) => testEntityPk)).toEqual([TEST_ENTITIES[0].testEntityPk])
           expect(batch.get(owner)).toEqual(single)
         })
+
+        it('should return each relation once when the join through a to-many relation matches several rows', async () => {
+          const owners = [
+            await pointManyToOneRelationAt('test-entity-2', 'test-relations-test-entity-1-2'),
+            await pointManyToOneRelationAt('test-entity-4', 'test-relations-test-entity-1-2')
+          ]
+          const queryService = moduleRef.get(TestEntityService)
+          const query = { filter: { manyTestEntities: { numberType: { lte: 4 } } } }
+
+          const batch = await queryService.queryRelations(TestRelation, 'manyToOneRelation', owners, query)
+
+          expect(owners.map((owner) => batch.get(owner).map(({ testRelationPk }) => testRelationPk))).toEqual([
+            ['test-relations-test-entity-1-2'],
+            ['test-relations-test-entity-1-2']
+          ])
+        })
       })
     })
   })
@@ -1514,6 +1530,24 @@ describe('TypeOrmQueryService', (): void => {
 
         expect(single?.testRelationPk).toBe('test-relations-test-entity-3-1')
         expect(batch.get(owner)).toEqual(single)
+      })
+
+      it('should find the relation of every entity when the filter join matches several rows per entity', async () => {
+        const owners = [
+          await pointManyToOneRelationAt('test-entity-2', 'test-relations-test-entity-1-2'),
+          await pointManyToOneRelationAt('test-entity-4', 'test-relations-test-entity-1-2'),
+          await pointManyToOneRelationAt('test-entity-6', 'test-relations-test-entity-1-2')
+        ]
+        const queryService = moduleRef.get(TestEntityService)
+        const filter = { manyTestEntities: { numberType: { lte: 10 } } }
+
+        const batch = await queryService.findRelation(TestRelation, 'manyToOneRelation', owners, { filter })
+
+        expect(owners.map((owner) => batch.get(owner)?.testRelationPk)).toEqual([
+          'test-relations-test-entity-1-2',
+          'test-relations-test-entity-1-2',
+          'test-relations-test-entity-1-2'
+        ])
       })
 
       it('should return undefined select if no results are found.', async () => {
